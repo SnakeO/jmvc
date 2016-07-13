@@ -1,0 +1,47 @@
+{
+	"name": "jmvc/jmvc_app",
+	"description": "Wordpress MVC framework",
+	"minimum-stability" :"dev",
+	"prefer-stable" : true,
+
+	"authors": [
+		{
+			"name": "Jay See",
+			"email": "jayseeyoumee@gmail.com"
+		}
+	],
+
+	"require": {
+		"guzzlehttp/guzzle": "~6.0",
+		"maknz/slack": "^1.7",
+		"predis/predis": "^1.0",
+		"mthenw/nosqlite": "*@stable"
+	},
+
+	"autoload": {
+		"classmap" : [
+			"app",
+			
+			"controllers/admin",
+			"controllers/pub",
+			"controllers/resource",
+
+			"libraries",
+			"libraries/plugins",
+			"models",
+
+			"system/app/dev",
+
+			"system/config",
+			"system/controller",
+			"system/library",
+			"system/model",
+			"system/view"
+		],
+
+		"files" : [
+			"system/JBag.php",
+			"system/helpers/utility.php"
+		]
+	}
+}
