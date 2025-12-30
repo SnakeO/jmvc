@@ -2862,7 +2862,7 @@ composer install
 
 ## License
 
-This project is open-sourced software. Please check with the repository owner for specific licensing terms.
+This project is open-sourced software licensed under the [MIT License](LICENSE).
 
 ---
 
