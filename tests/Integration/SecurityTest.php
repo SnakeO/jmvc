@@ -265,7 +265,8 @@ class SecurityTest extends TestCase
         $realOutside = realpath($outsidePath);
 
         if ($realOutside !== false) {
-            $this->assertStringNotStartsWith($basePath, $realOutside);
+            // Use strpos check for PHPUnit 9.x compatibility
+            $this->assertFalse(strpos($realOutside, $basePath) === 0, 'Path should not start with base path');
         }
 
         unlink($testFile);

@@ -1,10 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.5/phpunit.xsd"
-         bootstrap="tests/bootstrap.php"
+<phpunit bootstrap="tests/bootstrap.php"
          colors="true"
-         stopOnFailure="false"
-         cacheDirectory=".phpunit.cache">
+         stopOnFailure="false">
     <testsuites>
         <testsuite name="Unit">
             <directory>tests/Unit</directory>
@@ -13,17 +10,6 @@
             <directory>tests/Integration</directory>
         </testsuite>
     </testsuites>
-    <source>
-        <include>
-            <directory suffix=".php">system</directory>
-            <directory suffix=".php">controllers</directory>
-            <directory suffix=".php">models</directory>
-        </include>
-        <exclude>
-            <directory>vendor</directory>
-            <directory>tests</directory>
-        </exclude>
-    </source>
     <php>
         <const name="ABSPATH" value="/tmp/wordpress/"/>
     </php>
