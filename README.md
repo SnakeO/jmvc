@@ -688,24 +688,67 @@ $url = controller_url('pub', 'Task', 'show', 42);
 $url = controller_url('pub', 'Task', 'list', 'pending', 10);
 ```
 
-### Generating URLs in JavaScript
+### JavaScript Helpers (JMVC Object)
 
 Include the JavaScript helper:
 
-```php
+```html
 <script src="<?= get_template_directory_uri() ?>/jmvc/assets/js/global.js.php"></script>
 ```
 
-Then use in your scripts:
+The `JMVC` object provides URL helpers, security utilities, and AJAX wrappers:
+
+#### URL Helpers
 
 ```javascript
-// Generate controller URL
-const url = controller_url('pub', 'Task', 'show', 42);
+// Site URL
+JMVC.siteUrl('about-us')
+// https://example.com/about-us
 
-// Fetch from controller
-fetch(controller_url('pub', 'Task', 'index'))
-    .then(response => response.json())
-    .then(data => console.log(data));
+// Controller URL (legacy AJAX)
+JMVC.controllerUrl('pub', 'Task', 'show', 42)
+// https://example.com/controller/pub/Task/show/42
+
+// REST API URL (recommended)
+JMVC.restApiUrl('pub', 'Task', 'index')
+// https://example.com/wp-json/jmvc/v1/pub/Task/index
+```
+
+#### AJAX with Automatic Nonce
+
+```javascript
+// GET request (nonce included automatically)
+const response = await JMVC.get(JMVC.restApiUrl('pub', 'Task', 'index'));
+const data = await response.json();
+
+// POST JSON data
+await JMVC.post(JMVC.restApiUrl('pub', 'Task', 'create'), {
+    title: 'New Task',
+    list_id: 1
+});
+
+// POST form data
+await JMVC.postForm(JMVC.controllerUrl('pub', 'Task', 'create'), {
+    title: 'New Task'
+});
+```
+
+#### Security Helpers
+
+```javascript
+// Get current nonce
+const nonce = JMVC.getNonce();
+
+// Refresh nonce (for long-lived pages)
+const newNonce = await JMVC.refreshNonce();
+```
+
+#### Query String Parser
+
+```javascript
+// URL: https://example.com/?page=2&sort=date
+JMVC.qs('page')  // '2'
+JMVC.qs('sort')  // 'date'
 ```
 
 ### HMVC Module Routes
@@ -747,12 +790,17 @@ JMVC provides a modern REST API alongside the traditional AJAX routing system.
 
 ### Authentication
 
-For admin endpoints, requests require authentication. Include the nonce in the `X-WP-Nonce` header:
+For admin endpoints, requests require authentication. Use `JMVC.get()` or `JMVC.post()` which automatically include the nonce:
 
 ```javascript
+// Automatic nonce handling with JMVC helpers
+const response = await JMVC.get(JMVC.restApiUrl('admin', 'User', 'list'));
+const users = await response.json();
+
+// Or manual nonce with fetch
 fetch('/wp-json/jmvc/v1/admin/User/list', {
     headers: {
-        'X-WP-Nonce': wpApiSettings.nonce
+        'X-WP-Nonce': JMVC.getNonce()
     }
 });
 ```
@@ -2030,26 +2078,26 @@ if ($task->isOverdue()) $classes[] = 'overdue';
 ```javascript
 // assets/js/task-manager.js
 
-(function($) {
+(function() {
     'use strict';
 
-    // API endpoints using JMVC controller_url helper
+    // API endpoints using JMVC helpers
     const API = {
         tasks: {
-            list:   (params) => controller_url('pub', 'Task', 'index') + (params ? '?' + new URLSearchParams(params) : ''),
-            show:   (id) => controller_url('pub', 'Task', 'show', id),
-            create: () => controller_url('pub', 'Task', 'create'),
-            update: (id) => controller_url('pub', 'Task', 'update', id),
-            delete: (id) => controller_url('pub', 'Task', 'delete', id),
-            toggle: (id) => controller_url('pub', 'Task', 'toggle', id),
-            stats:  () => controller_url('pub', 'Task', 'stats')
+            list:   (params) => JMVC.restApiUrl('pub', 'Task', 'index') + (params ? '?' + new URLSearchParams(params) : ''),
+            show:   (id) => JMVC.restApiUrl('pub', 'Task', 'show', id),
+            create: () => JMVC.restApiUrl('pub', 'Task', 'create'),
+            update: (id) => JMVC.restApiUrl('pub', 'Task', 'update', id),
+            delete: (id) => JMVC.restApiUrl('pub', 'Task', 'delete', id),
+            toggle: (id) => JMVC.restApiUrl('pub', 'Task', 'toggle', id),
+            stats:  () => JMVC.restApiUrl('pub', 'Task', 'stats')
         },
         lists: {
-            list:   () => controller_url('pub', 'TaskList', 'index'),
-            show:   (id) => controller_url('pub', 'TaskList', 'show', id),
-            create: () => controller_url('pub', 'TaskList', 'create'),
-            update: (id) => controller_url('pub', 'TaskList', 'update', id),
-            delete: (id) => controller_url('pub', 'TaskList', 'delete', id)
+            list:   () => JMVC.restApiUrl('pub', 'TaskList', 'index'),
+            show:   (id) => JMVC.restApiUrl('pub', 'TaskList', 'show', id),
+            create: () => JMVC.restApiUrl('pub', 'TaskList', 'create'),
+            update: (id) => JMVC.restApiUrl('pub', 'TaskList', 'update', id),
+            delete: (id) => JMVC.restApiUrl('pub', 'TaskList', 'delete', id)
         }
     };
 
@@ -2067,7 +2115,7 @@ if ($task->isOverdue()) $classes[] = 'overdue';
         }
 
         try {
-            const response = await fetch(API.tasks.list(currentFilters));
+            const response = await JMVC.get(API.tasks.list(currentFilters));
             const data = await response.json();
 
             if (data.success) {
@@ -2146,11 +2194,7 @@ if ($task->isOverdue()) $classes[] = 'overdue';
      */
     window.toggleTask = async function(id) {
         try {
-            const response = await fetch(API.tasks.toggle(id), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-            });
-
+            const response = await JMVC.postForm(API.tasks.toggle(id), {});
             const data = await response.json();
 
             if (data.success) {
@@ -2176,7 +2220,7 @@ if ($task->isOverdue()) $classes[] = 'overdue';
      */
     window.editTask = async function(id) {
         try {
-            const response = await fetch(API.tasks.show(id));
+            const response = await JMVC.get(API.tasks.show(id));
             const data = await response.json();
 
             if (data.success) {
@@ -2207,11 +2251,7 @@ if ($task->isOverdue()) $classes[] = 'overdue';
         }
 
         try {
-            const response = await fetch(API.tasks.delete(id), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-            });
-
+            const response = await JMVC.postForm(API.tasks.delete(id), {});
             const data = await response.json();
 
             if (data.success) {
@@ -2244,11 +2284,7 @@ if ($task->isOverdue()) $classes[] = 'overdue';
         const url = id ? API.tasks.update(id) : API.tasks.create();
 
         try {
-            const response = await fetch(url, {
-                method: 'POST',
-                body: new URLSearchParams(formData)
-            });
-
+            const response = await JMVC.postForm(url, formData);
             const data = await response.json();
 
             if (data.success) {
@@ -2292,7 +2328,7 @@ if ($task->isOverdue()) $classes[] = 'overdue';
      */
     async function updateStats() {
         try {
-            const response = await fetch(API.tasks.stats());
+            const response = await JMVC.get(API.tasks.stats());
             const data = await response.json();
 
             if (data.success) {
