@@ -1,51 +1,95 @@
-<?php  
+<?php
+/**
+ * JMVC Controller Loader
+ *
+ * @package JMVC
+ */
 
-class JController {
+if (!defined('ABSPATH')) {
+    exit;
+}
 
-	protected $module;	// set this for HMVC modules
+class JController
+{
+    /**
+     * Current HMVC module
+     *
+     * @var string|null
+     */
+    protected $module;
 
-	/**
-	 * Constructor
-	 */
-	public function __construct()
-	{
-	
-	}
+    /**
+     * Constructor
+     */
+    public function __construct()
+    {
+        // Override in subclasses
+    }
 
-	public static function load($controllername, $env='admin', $module=null)
-	{
-		if( $env != 'admin' && $env != 'pub' && $env != 'resource' ) {
-			die('bad JControler::load environment: ' . $env);
-		}
+    /**
+     * Load a controller class
+     *
+     * @param string $controllername The controller name
+     * @param string $env The environment (admin, pub, resource)
+     * @param string|null $module The HMVC module name
+     * @return object|false The controller instance or false if not found
+     */
+    public static function load($controllername, $env = 'admin', $module = null)
+    {
+        $valid_envs = array('admin', 'pub', 'resource');
 
-		// WPController -> wpcontroller.php
-		$controller_filename = "$controllername.php";
+        if (!in_array($env, $valid_envs, true)) {
+            wp_die(esc_html('Invalid JController::load environment: ' . $env));
+        }
 
-		// from main or module?
-		if( !$module ) 
-		{
-			$path = JMVC . "controllers/$env/$controller_filename";
+        // Sanitize controller name to prevent directory traversal
+        $controllername = sanitize_file_name($controllername);
+        $controller_filename = $controllername . '.php';
 
-			if( !file_exists($path) ) {
-				return false;
-			}
+        // Load from main or module
+        if (!$module) {
+            $path = JMVC . 'controllers/' . $env . '/' . $controller_filename;
 
-			require_once($path);
-			$class = $controllername;
-		}
-		else 
-		{
-			$path = JMVC . "modules/$module/controllers/$env/$controller_filename";
-				
-			if( !file_exists($path) ) {
-				return false;
-			}
+            if (!file_exists($path)) {
+                return false;
+            }
 
-			// modules are namespaced -- build a namespaced class like \giveaway\resource\Giveaway or \giveaway\admin\WPGiveawaySetup
-			require_once($path);
-			$class = "$module\\$env\\$controllername";
-		}
+            // Verify path is within allowed directory
+            $real_path = realpath($path);
+            $real_base = realpath(JMVC . 'controllers/');
 
-		return new $class();
-	}
+            if ($real_path === false || strpos($real_path, $real_base) !== 0) {
+                return false;
+            }
+
+            require_once $path;
+            $class = $controllername;
+        } else {
+            // Sanitize module name
+            $module = sanitize_file_name($module);
+            $path = JMVC . 'modules/' . $module . '/controllers/' . $env . '/' . $controller_filename;
+
+            if (!file_exists($path)) {
+                return false;
+            }
+
+            // Verify path is within allowed directory
+            $real_path = realpath($path);
+            $real_base = realpath(JMVC . 'modules/');
+
+            if ($real_path === false || strpos($real_path, $real_base) !== 0) {
+                return false;
+            }
+
+            // Modules are namespaced
+            require_once $path;
+            $class = $module . '\\' . $env . '\\' . $controllername;
+        }
+
+        if (!class_exists($class)) {
+            return false;
+        }
+
+        return new $class();
+    }
 }

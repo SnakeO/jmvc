@@ -1,47 +1,111 @@
 <?php
+/**
+ * JMVC Logging System
+ *
+ * @package JMVC
+ */
+
+if (!defined('ABSPATH')) {
+    exit;
+}
 
 class JLog
 {
-	public static $should_slack = true;
-	public static $flash_log = array();
+    /**
+     * Whether to send logs to Slack
+     *
+     * @var bool
+     */
+    public static $should_slack = true;
 
-	public static function init()
-	{
-		register_shutdown_function(array('JLog', 'slackOutLog'));
-	}
+    /**
+     * Flash log messages for this request
+     *
+     * @var array
+     */
+    public static $flash_log = array();
 
-	public static function slackOutLog()
-	{
-		if( static::$should_slack && count(Jlog::$flash_log) ) {
-			DevAlert::slack('JLog', implode("\n", Jlog::$flash_log));
-		}
-	}
+    /**
+     * Initialize the logging system
+     */
+    public static function init()
+    {
+        register_shutdown_function(array(__CLASS__, 'slackOutLog'));
+    }
 
-	public static function log($which, $msg, $deets='')
-	{
-		$kvstore = JBag::get('kvstore');
-		$log = $kvstore->get("Jlog/$which");
+    /**
+     * Send accumulated logs to Slack on shutdown
+     */
+    public static function slackOutLog()
+    {
+        if (static::$should_slack && count(static::$flash_log) > 0) {
+            DevAlert::slack('JLog', implode("\n", static::$flash_log));
+        }
+    }
 
-		$logline = date('Y-m-d H:i:s') . " [$which] - $msg " . print_r($deets, true);
-		
-		// store to log
-		$log .= $logline . "\n";
-		$kvstore->set("Jlog/$which", $log);
-		static::$flash_log[] = $logline;
-	}
+    /**
+     * Log a message
+     *
+     * @param string $which Log level/category
+     * @param string $msg Log message
+     * @param mixed $deets Additional details
+     */
+    public static function log($which, $msg, $deets = '')
+    {
+        $kvstore = JBag::get('kvstore');
 
-	public static function info($msg, $deets='')
-	{
-		JLog::log('info', $msg, $deets);
-	}
+        if (!$kvstore) {
+            error_log(sprintf('[JMVC %s] %s %s', $which, $msg, print_r($deets, true)));
+            return;
+        }
 
-	public static function warn($msg, $deets='')
-	{
-		JLog::log('warn', $msg, $deets);
-	}
+        $log = $kvstore->get('Jlog/' . $which);
+        $log = $log ?: '';
 
-	public static function error($msg, $deets='')
-	{
-		JLog::log('error', $msg, $deets);
-	}
+        $logline = sprintf(
+            '%s [%s] - %s %s',
+            gmdate('Y-m-d H:i:s'),
+            esc_html($which),
+            esc_html($msg),
+            is_string($deets) ? esc_html($deets) : print_r($deets, true)
+        );
+
+        // Store to log
+        $log .= $logline . "\n";
+        $kvstore->set('Jlog/' . $which, $log);
+        static::$flash_log[] = $logline;
+    }
+
+    /**
+     * Log an info message
+     *
+     * @param string $msg Message
+     * @param mixed $deets Details
+     */
+    public static function info($msg, $deets = '')
+    {
+        self::log('info', $msg, $deets);
+    }
+
+    /**
+     * Log a warning message
+     *
+     * @param string $msg Message
+     * @param mixed $deets Details
+     */
+    public static function warn($msg, $deets = '')
+    {
+        self::log('warn', $msg, $deets);
+    }
+
+    /**
+     * Log an error message
+     *
+     * @param string $msg Message
+     * @param mixed $deets Details
+     */
+    public static function error($msg, $deets = '')
+    {
+        self::log('error', $msg, $deets);
+    }
 }

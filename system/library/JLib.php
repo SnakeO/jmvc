@@ -1,78 +1,128 @@
-<?php  
+<?php
+/**
+ * JMVC Library Loader
+ *
+ * @package JMVC
+ */
 
-class JLib 
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+class JLib
 {
-	public static $libs;
+    /**
+     * Loaded library instances
+     *
+     * @var array
+     */
+    public static $libs = array();
 
-	public function __construct($module=null)
-	{
-		$this->module = $module;
-	}
+    /**
+     * Current module
+     *
+     * @var string|null
+     */
+    public $module;
 
-	public static function load($librarypath, $module=null)
-	{
-		// alraedy loaded?
-		if( isset(self::$libs[$librarypath]) ) {
-			return self::$libs[$librarypath];
-		}
+    /**
+     * Constructor
+     *
+     * @param string|null $module HMVC module name
+     */
+    public function __construct($module = null)
+    {
+        $this->module = $module;
+    }
 
-		// allow for libraries to live in nested subdirectories
-		$pathinfo = pathinfo($librarypath);
-		$libraryname = $pathinfo['basename'];
-		$librarydir = $pathinfo['dirname'];
+    /**
+     * Load a library class
+     *
+     * @param string $librarypath Library path relative to libraries directory
+     * @param string|null $module HMVC module name
+     * @return object|false Library instance or false if not found
+     * @throws Exception If class doesn't exist
+     */
+    public static function load($librarypath, $module = null)
+    {
+        // Already loaded?
+        if (isset(self::$libs[$librarypath])) {
+            return self::$libs[$librarypath];
+        }
 
-		if( $librarydir == '.' ) {
-			$librarydir = '';
-		}
+        // Sanitize inputs
+        $librarypath = preg_replace('/[^a-zA-Z0-9_\/\-]/', '', $librarypath);
+        $module = $module ? sanitize_file_name($module) : null;
 
-		// VoucherMailer -> VoucherMailer.php
-		$library_filename = "$libraryname.php";
+        // Allow for libraries to live in nested subdirectories
+        $pathinfo = pathinfo($librarypath);
+        $libraryname = $pathinfo['basename'];
+        $librarydir = $pathinfo['dirname'];
 
-		// from main or module?
-		if( !$module ) 
-		{
-			$path = JMVC . "libraries/$librarydir/$library_filename";
+        if ($librarydir === '.') {
+            $librarydir = '';
+        }
 
-			if( !file_exists($path) ) 
-			{
-				// try lowercase
-				$library_filename = strtolower($library_filename);
-				$path = JMVC . "libraries/$librarydir/$library_filename";
+        $library_filename = $libraryname . '.php';
 
-				if( !file_exists($path) ) {	
-					return false;
-				}
-			}
+        // Load from main or module
+        if (!$module) {
+            $base_path = JMVC . 'libraries/';
+            $path = $base_path . ($librarydir ? $librarydir . '/' : '') . $library_filename;
 
-			require_once($path);
-			$class = $librarydir ? "\\libraries\\$librarydir\\$libraryname" : "\\libraries\\$libraryname";
-		}
-		else 
-		{
-			$path = JMVC . "modules/$module/libraries/$librarydir/$library_filename";
-				
-			if( !file_exists($path) ) 
-			{
-				// try lowercase
-				$library_filename = strtolower($library_filename);
-				$path = JMVC . "modules/$module/libraries/$librarydir/$library_filename";
+            if (!file_exists($path)) {
+                // Try lowercase
+                $library_filename = strtolower($library_filename);
+                $path = $base_path . ($librarydir ? $librarydir . '/' : '') . $library_filename;
 
-				if( !file_exists($path) ) {	
-					return false;
-				}
-			}
+                if (!file_exists($path)) {
+                    return false;
+                }
+            }
 
-			// modules are namespaced -- build a namespaced class like \giveaway\resource\Giveaway or \giveaway\admin\WPGiveawaySetup
-			require_once($path);
-			$class = $librarydir ?  "$module\\libraries\\$librarydir\\$libraryname" : "$module\\libraries\\$libraryname";
-		}
+            // Verify path is within allowed directory
+            $real_path = realpath($path);
+            $real_base = realpath($base_path);
 
-		if( !class_exists($class) ) {
-			print_r(debug_backtrace());
-			throw new Exception("Class $class doesn't exist");
-		}
+            if ($real_path === false || strpos($real_path, $real_base) !== 0) {
+                return false;
+            }
 
-		self::$libs[$librarypath] = new $class();
-		return self::$libs[$librarypath];
-	}
+            require_once $path;
+            $class = $librarydir ? '\\libraries\\' . $librarydir . '\\' . $libraryname : '\\libraries\\' . $libraryname;
+        } else {
+            $base_path = JMVC . 'modules/' . $module . '/libraries/';
+            $path = $base_path . ($librarydir ? $librarydir . '/' : '') . $library_filename;
+
+            if (!file_exists($path)) {
+                // Try lowercase
+                $library_filename = strtolower($library_filename);
+                $path = $base_path . ($librarydir ? $librarydir . '/' : '') . $library_filename;
+
+                if (!file_exists($path)) {
+                    return false;
+                }
+            }
+
+            // Verify path is within allowed directory
+            $real_path = realpath($path);
+            $real_base = realpath(JMVC . 'modules/');
+
+            if ($real_path === false || strpos($real_path, $real_base) !== 0) {
+                return false;
+            }
+
+            require_once $path;
+            $class = $librarydir
+                ? $module . '\\libraries\\' . $librarydir . '\\' . $libraryname
+                : $module . '\\libraries\\' . $libraryname;
+        }
+
+        if (!class_exists($class)) {
+            throw new Exception('Class does not exist: ' . esc_html($class));
+        }
+
+        self::$libs[$librarypath] = new $class();
+        return self::$libs[$librarypath];
+    }
 }

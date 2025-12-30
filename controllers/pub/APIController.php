@@ -1,117 +1,167 @@
 <?php
+/**
+ * Base API Controller for JSON endpoints
+ *
+ * @package JMVC
+ */
+
+if (!defined('ABSPATH')) {
+    exit;
+}
 
 class APIController
 {
-	protected $api_result_mode = 'json';
+    protected $api_result_mode = 'json';
 
-	// return an associative array with $fields extracted from it (or the full item if fields is empty array)
-	protected function extractFields($assoc_array, $fields)
-	{
-		if(!$fields) {
-			return $assoc_array;
-		}
+    /**
+     * Extract only specified fields from an associative array
+     *
+     * @param array $assoc_array The source array
+     * @param array $fields Fields to extract (empty returns all)
+     * @return array Filtered array
+     */
+    protected function extractFields($assoc_array, $fields)
+    {
+        if (!$fields) {
+            return $assoc_array;
+        }
 
-		foreach($assoc_array as $k=>$v) 
-		{
-			if( !in_array($k, $fields) ) {
-				unset($assoc_array[$k]);
-			}
-		}
+        foreach ($assoc_array as $k => $v) {
+            if (!in_array($k, $fields, true)) {
+                unset($assoc_array[$k]);
+            }
+        }
 
-		return $assoc_array;
-	}
+        return $assoc_array;
+    }
 
-	// clean up $_REQUEST parameters
-	protected function cleanParams($params)
-	{
-		// string -> boolean
-		foreach($params as $k=>$v) 
-		{
-			if($v === 'true' || $v === 'false') {
-				$params[$k] = ($v == 'true');
-			}
-		}
+    /**
+     * Clean up and sanitize request parameters
+     *
+     * @param array $params Raw parameters
+     * @return array Cleaned parameters
+     */
+    protected function cleanParams($params)
+    {
+        // string -> boolean conversion
+        foreach ($params as $k => $v) {
+            if ($v === 'true' || $v === 'false') {
+                $params[$k] = ($v === 'true');
+            }
+        }
 
-		if( @$params['fields'] ) {
-			$params['fields'] = explode('|', $params['fields']);
-		}
+        if (!empty($params['fields'])) {
+            $params['fields'] = array_map('sanitize_text_field', explode('|', $params['fields']));
+        }
 
-		return $params;
-	}
+        return $params;
+    }
 
-	function api_set_mode($mode)
-	{
-		$this->api_result_mode = $mode;
-	}
+    /**
+     * Set the API result mode
+     *
+     * @param string $mode 'json' or 'return'
+     */
+    public function api_set_mode($mode)
+    {
+        $this->api_result_mode = sanitize_key($mode);
+    }
 
-	// simple JSON api
-	function api_result($success, $result=array())
-	{
-		$result['success'] = $success;
-		//api_stringify($result); // everything's a string
-		
-		if( $this->api_result_mode == 'json' )
-		{
-			$json = json_encode($result);
+    /**
+     * Output API result as JSON
+     *
+     * @param bool $success Whether the request was successful
+     * @param array $result Result data
+     * @return mixed JSON output or object depending on mode
+     */
+    public function api_result($success, $result = array())
+    {
+        $result['success'] = (bool) $success;
 
-			// jsonp?
-			$callback = @$_REQUEST['callback'];
-			if( $callback != null ) 
-			{
-				$json = $callback . "($json)";
-				header("Content-Type: text/javascript");
-			}
-			else {
-				header("Content-Type: application/json");
-			}
-			echo $json;
-		}
-		else if( $this->api_result_mode == 'return' )
-		{
-			// use StdClass
-			return json_decode(json_encode($result));
-		}
-		else echo "bad result mode: $this->api_result_mode";
-	}
+        if ($this->api_result_mode === 'json') {
+            $json = wp_json_encode($result);
 
-	// everything's a string
-	function api_stringify(&$fields)
-	{
-		foreach($fields as $k => $v) 
-		{
-			if( is_string($v) ) {
-				continue;
-			}
+            // JSONP support with sanitized callback
+            $callback = isset($_REQUEST['callback']) ? $_REQUEST['callback'] : null;
 
-			if( is_bool($v) ) {
-				$fields[$k] = $v ? 'true' : 'false';
-			}
+            if ($callback !== null) {
+                // Sanitize callback to prevent XSS - only allow valid JS function names
+                $callback = preg_replace('/[^a-zA-Z0-9_\$]/', '', $callback);
 
-			if( is_int($v) || is_float($v) ) {
-				$fields[$k] = strval($v);
-			}
+                if (!empty($callback)) {
+                    $json = $callback . '(' . $json . ')';
+                    header('Content-Type: text/javascript; charset=utf-8');
+                } else {
+                    header('Content-Type: application/json; charset=utf-8');
+                }
+            } else {
+                header('Content-Type: application/json; charset=utf-8');
+            }
 
-			if( is_object($v) || is_array($v) ) {
-				$this->api_stringify($fields[$k]);
-			}
-		}
-	}
+            echo $json;
+            return;
+        }
 
-	function api_success($result=array())
-	{
-		return $this->api_result(true, $result);
-	}
+        if ($this->api_result_mode === 'return') {
+            return json_decode(wp_json_encode($result));
+        }
 
-	function api_die($msg, $result=array())
-	{
-		$result['message'] = $msg;
+        wp_die(esc_html('Invalid result mode: ' . $this->api_result_mode));
+    }
 
-		if( !$result['reason'] ) {
-			$result['reason'] = 'api_die';
-		}
+    /**
+     * Convert all values to strings recursively
+     *
+     * @param array $fields Array to stringify
+     */
+    public function api_stringify(&$fields)
+    {
+        foreach ($fields as $k => $v) {
+            if (is_string($v)) {
+                continue;
+            }
 
-		$this->api_result(false, $result);
+            if (is_bool($v)) {
+                $fields[$k] = $v ? 'true' : 'false';
+            }
 
-		die();
-	}
+            if (is_int($v) || is_float($v)) {
+                $fields[$k] = strval($v);
+            }
+
+            if (is_object($v) || is_array($v)) {
+                $this->api_stringify($fields[$k]);
+            }
+        }
+    }
+
+    /**
+     * Return a success response
+     *
+     * @param array $result Result data
+     * @return mixed
+     */
+    public function api_success($result = array())
+    {
+        return $this->api_result(true, $result);
+    }
+
+    /**
+     * Return an error response and terminate
+     *
+     * @param string $msg Error message
+     * @param array $result Additional result data
+     */
+    public function api_die($msg, $result = array())
+    {
+        $result['message'] = $msg;
+
+        if (empty($result['reason'])) {
+            $result['reason'] = 'api_die';
+        }
+
+        $this->api_result(false, $result);
+
+        exit;
+    }
 }

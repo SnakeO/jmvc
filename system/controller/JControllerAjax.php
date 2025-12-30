@@ -1,162 +1,261 @@
 <?php
-
-/*
-	Here's some .htaccess rules:
-	RewriteRule ^controller/(pub|admin|resource)/(.*) wp-admin/admin-ajax.php?action=$1_controller&path=$2 [L,QSA]
-	RewriteRule ^hmvc_controller/(pub|admin|resource)/(.*?)/(.*) wp-admin/admin-ajax.php?action=$1_controller&path=$3&module=$2 [L,QSA]
- 
-	NGINX:
-	rewrite ^/controller/(pub|admin|resource)/(.*) /wp-admin/admin-ajax.php?action=$1_controller&path=$2 last; break;
-	rewrite ^/hmvc_controller/(pub|admin|resource)/(.*?)/(.*) /wp-admin/admin-ajax.php?action=$1_controller&path=$3&module=$2 last; break;
+/**
+ * JMVC AJAX Controller System
+ *
+ * .htaccess rules:
+ * RewriteRule ^controller/(pub|admin|resource)/(.*) wp-admin/admin-ajax.php?action=$1_controller&path=$2 [L,QSA]
+ * RewriteRule ^hmvc_controller/(pub|admin|resource)/(.*?)/(.*) wp-admin/admin-ajax.php?action=$1_controller&path=$3&module=$2 [L,QSA]
+ *
+ * NGINX:
+ * rewrite ^/controller/(pub|admin|resource)/(.*) /wp-admin/admin-ajax.php?action=$1_controller&path=$2 last; break;
+ * rewrite ^/hmvc_controller/(pub|admin|resource)/(.*?)/(.*) /wp-admin/admin-ajax.php?action=$1_controller&path=$3&module=$2 last; break;
+ *
+ * @package JMVC
  */
 
-class JControllerAjax {
+if (!defined('ABSPATH')) {
+    exit;
+}
 
-	public static function init()
-	{
-		return new self();
-	}
+class JControllerAjax
+{
+    /**
+     * Initialize the AJAX controller system
+     *
+     * @return JControllerAjax
+     */
+    public static function init()
+    {
+        return new self();
+    }
 
-	/**
-	 * Class constructor. Set up some filters and actions.
-	 *
-	 * @return null
-	 */
-	function __construct() 
-	{
-		// controllers for the admin side of wordpress
-		add_action('wp_ajax_admin_controller', array($this, 'admin_controller'));
+    /**
+     * Class constructor. Set up filters and actions.
+     */
+    public function __construct()
+    {
+        // Controllers for the admin side of WordPress
+        add_action('wp_ajax_admin_controller', array($this, 'admin_controller'));
 
-		// controllers for the front-facing side of wordpress
-		add_action('wp_ajax_pub_controller', array($this, 'pub_controller'));
-		add_action('wp_ajax_nopriv_pub_controller', array($this, 'pub_controller'));
+        // Controllers for the front-facing side of WordPress
+        add_action('wp_ajax_pub_controller', array($this, 'pub_controller'));
+        add_action('wp_ajax_nopriv_pub_controller', array($this, 'pub_controller'));
 
-		// controllers for ajax resources
-		add_action('wp_ajax_resource_controller', array($this, 'resource_controller'));
-		add_action('wp_ajax_nopriv_resource_controller', array($this, 'resource_controller'));
+        // Controllers for AJAX resources
+        add_action('wp_ajax_resource_controller', array($this, 'resource_controller'));
+        add_action('wp_ajax_nopriv_resource_controller', array($this, 'resource_controller'));
 
-		// query vars that this class needs
-		add_filter( 'query_vars', array($this, 'query_vars') );
-	}
+        // Query vars that this class needs
+        add_filter('query_vars', array($this, 'query_vars'));
 
-	function admin_controller()
-	{
-		$this->ajax_controller('admin');
-	}
+        // Register nonce creation endpoint
+        add_action('wp_ajax_jmvc_nonce', array($this, 'get_nonce'));
+        add_action('wp_ajax_nopriv_jmvc_nonce', array($this, 'get_nonce'));
+    }
 
-	function pub_controller()
-	{
-		$this->ajax_controller('pub');
-	}
+    /**
+     * Get a nonce for AJAX requests
+     */
+    public function get_nonce()
+    {
+        wp_send_json(array(
+            'nonce' => wp_create_nonce('jmvc_ajax_nonce'),
+        ));
+    }
 
-	function resource_controller()
-	{
-		$this->ajax_controller('resource');
-	}
+    /**
+     * Verify AJAX nonce
+     *
+     * @param bool $required Whether nonce is required (admin always requires)
+     * @return bool True if valid
+     */
+    protected function verify_nonce($required = true)
+    {
+        $nonce = isset($_REQUEST['_jmvc_nonce']) ? sanitize_text_field($_REQUEST['_jmvc_nonce']) : '';
 
-	/**
-	 * Loads in the requested controller and calls the requested function
-	 * @param  string $env the environment to find the controller in (pub, admin, resource)
-	 * @return void      Calls the controller then exit()
-	 */
-	function ajax_controller($env)
-	{
-		$module = @$_GET['module'] ? $_GET['module'] : null;
-		$path = @$_GET['path'] or die('no path');
-		$parts = explode('/', $path);
+        if ($required && !wp_verify_nonce($nonce, 'jmvc_ajax_nonce')) {
+            wp_send_json_error(array('message' => 'Security check failed'), 403);
+            exit;
+        }
 
-		$controller = array_shift($parts);
+        return wp_verify_nonce($nonce, 'jmvc_ajax_nonce');
+    }
 
-		if( !$funk = array_shift($parts) ) {
-			$funk = 'index';
-		}
+    /**
+     * Admin controller handler
+     */
+    public function admin_controller()
+    {
+        // Admin controllers always require nonce and login
+        if (!is_user_logged_in()) {
+            wp_send_json_error(array('message' => 'Authentication required'), 401);
+            exit;
+        }
 
-		$params = $parts;
+        $this->verify_nonce(true);
+        $this->ajax_controller('admin');
+    }
 
-		if( $params[0] == null ) {
-			array_shift($params);
-		}
+    /**
+     * Public controller handler
+     */
+    public function pub_controller()
+    {
+        // Public controllers optionally verify nonce
+        $this->verify_nonce(false);
+        $this->ajax_controller('pub');
+    }
 
-		$obj = JController::load($controller, $env, $module);
+    /**
+     * Resource controller handler
+     */
+    public function resource_controller()
+    {
+        // Resource controllers optionally verify nonce
+        $this->verify_nonce(false);
+        $this->ajax_controller('resource');
+    }
 
-		if( !$obj ) 
-		{
-			$details = array(
-				'controller'	=> $controller,
-				'env' 			=> $env,
-				'module'		=> $module,
-				'funk'			=> $funk
-			);
+    /**
+     * Loads in the requested controller and calls the requested function
+     *
+     * @param string $env The environment (pub, admin, resource)
+     */
+    public function ajax_controller($env)
+    {
+        // Sanitize inputs
+        $module = isset($_GET['module']) ? sanitize_file_name($_GET['module']) : null;
+        $path = isset($_GET['path']) ? sanitize_text_field($_GET['path']) : '';
 
-			DevAlert::slack("no controller: $controller", $details);
+        if (empty($path)) {
+            wp_send_json_error(array('message' => 'No path specified'), 400);
+            exit;
+        }
 
-			die("no controller: $controller");
-		}
+        $parts = explode('/', $path);
+        $controller = sanitize_file_name(array_shift($parts));
 
-		if( !method_exists($obj, $funk) )
-		{
-			$details = array(
-				'controller'	=> $controller,
-				'env' 			=> $env,
-				'module'		=> $module,
-				'funk'			=> $funk
-			);
+        $funk = array_shift($parts);
+        if (empty($funk)) {
+            $funk = 'index';
+        }
+        $funk = sanitize_key($funk);
 
-			DevAlert::slack("no controller: $controller", $details);
+        // Filter out empty params
+        $params = array_filter($parts, function ($p) {
+            return $p !== null && $p !== '';
+        });
+        $params = array_values($params);
 
-			die("bad function in controller $controller: $funk");
-		}
+        // Sanitize params
+        $params = array_map('sanitize_text_field', $params);
 
-		// call controller method
-		call_user_func_array( array($obj, $funk), $params);
+        $obj = JController::load($controller, $env, $module);
 
-		exit;
-	}
+        if (!$obj) {
+            $details = array(
+                'controller' => $controller,
+                'env'        => $env,
+                'module'     => $module,
+                'funk'       => $funk,
+            );
 
-	/**
-	 * Add on to the array of allowed GET query vars
-	 * @param  array $query_vars The current array of query vars
-	 * @return array             The new array of query vars, with ours appended to it
-	 */
-	function query_vars( $query_vars )
-	{	
-		$query_vars[] = 'action';
-		$query_vars[] = 'path';
-		$query_vars[] = 'module';	// for HMVC
-		return $query_vars;
-	}
+            DevAlert::slack('Controller not found: ' . $controller, $details);
+
+            wp_send_json_error(
+                array('message' => 'Controller not found: ' . esc_html($controller)),
+                404
+            );
+            exit;
+        }
+
+        if (!method_exists($obj, $funk)) {
+            $details = array(
+                'controller' => $controller,
+                'env'        => $env,
+                'module'     => $module,
+                'funk'       => $funk,
+            );
+
+            DevAlert::slack('Method not found: ' . $funk, $details);
+
+            wp_send_json_error(
+                array('message' => 'Method not found in controller ' . esc_html($controller) . ': ' . esc_html($funk)),
+                404
+            );
+            exit;
+        }
+
+        // Call controller method
+        call_user_func_array(array($obj, $funk), $params);
+
+        exit;
+    }
+
+    /**
+     * Add query vars for controller routing
+     *
+     * @param array $query_vars Current query vars
+     * @return array Updated query vars
+     */
+    public function query_vars($query_vars)
+    {
+        $query_vars[] = 'action';
+        $query_vars[] = 'path';
+        $query_vars[] = 'module'; // for HMVC
+        return $query_vars;
+    }
 }
 
 /**
- * Global function used to generate URLs to access our controllers
- * @param  string $url    The URL in the format of ControllerClass/ControllerFunction/ControllerMethod/param/param/param
- * @param  string $env    The environment.. pub, admin, resource. Defaults to 'admin'
- * @param  string $module The HVMC module name (optional)
- * @return string         The generated URL
+ * Generate URL for controller endpoint
+ *
+ * @param string $url The URL path (ControllerClass/ControllerFunction/param/param)
+ * @param string $env The environment (pub, admin, resource)
+ * @param string|null $module The HMVC module name (optional)
+ * @return string The generated URL
  */
-function controller_url($url, $env='admin', $module=null)
+function controller_url($url, $env = 'admin', $module = null)
 {
-	if( $env != 'admin' && $env != 'public' && $env != 'pub' && $env != 'resource' ) {
-		die('bad controller_url environment: ' . $env);
-	}
+    $valid_envs = array('admin', 'public', 'pub', 'resource');
 
-	$url = explode('/', $url);
+    if (!in_array($env, $valid_envs, true)) {
+        wp_die(esc_html('Invalid controller environment: ' . $env));
+    }
 
-	$controller = array_shift($url) or die("no controller: $url");
-	$function = array_shift($url) or die("no function: $url");
+    $url_parts = explode('/', $url);
 
-	$params = count($url) > 0 ? '/' . implode('/', $url) : '';
+    $controller = array_shift($url_parts);
+    if (empty($controller)) {
+        wp_die('Controller name required');
+    }
 
-//	$module_qs = $module ? "&module=$module" : '';
+    $function = array_shift($url_parts);
+    if (empty($function)) {
+        wp_die('Function name required');
+    }
 
-	// use pretty controllers
-	if( !$module ) {
-		return site_url("/controller/$env/$controller/$function$params");
-	}
+    // Sanitize parts
+    $controller = sanitize_file_name($controller);
+    $function = sanitize_key($function);
 
-	return site_url("hmvc_controller/$env/$module/$controller/$function$params");
+    $params = count($url_parts) > 0 ? '/' . implode('/', array_map('sanitize_text_field', $url_parts)) : '';
 
-//	return site_url("/wp-admin/admin-ajax.php?action=" . $env . "_controller&path=$controller/$function$params$module_qs");
+    // Use pretty controllers
+    if (!$module) {
+        return site_url('/controller/' . $env . '/' . $controller . '/' . $function . $params);
+    }
+
+    $module = sanitize_file_name($module);
+    return site_url('/hmvc_controller/' . $env . '/' . $module . '/' . $controller . '/' . $function . $params);
 }
 
-?>
+/**
+ * Get a fresh JMVC nonce for AJAX calls
+ *
+ * @return string The nonce value
+ */
+function jmvc_get_nonce()
+{
+    return wp_create_nonce('jmvc_ajax_nonce');
+}

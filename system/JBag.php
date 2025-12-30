@@ -1,20 +1,70 @@
-<?php  
+<?php
+/**
+ * JMVC Service Locator / Global Store
+ *
+ * @package JMVC
+ */
 
-/* global get/set */
+if (!defined('ABSPATH')) {
+    exit;
+}
 
-class JBag 
+class JBag
 {
-	public static $module;
+    /**
+     * Current HMVC module
+     *
+     * @var string|null
+     */
+    public static $module;
 
-	static $things = array();
+    /**
+     * Storage array for services
+     *
+     * @var array
+     */
+    private static $things = array();
 
-	public static function set($k, $v)
-	{
-		self::$things[$k] = $v;
-	}
+    /**
+     * Store a value
+     *
+     * @param string $k Key
+     * @param mixed $v Value
+     */
+    public static function set($k, $v)
+    {
+        self::$things[$k] = $v;
+    }
 
-	public static function get($k) 
-	{
-		return @self::$things[$k];
-	}
+    /**
+     * Retrieve a value
+     *
+     * @param string $k Key
+     * @return mixed|null The value or null if not found
+     */
+    public static function get($k)
+    {
+        return self::$things[$k] ?? null;
+    }
+
+    /**
+     * Check if a key exists
+     *
+     * @param string $k Key
+     * @return bool True if key exists
+     */
+    public static function has($k)
+    {
+        return array_key_exists($k, self::$things);
+    }
+
+    /**
+     * Remove a value
+     *
+     * @param string $k Key
+     */
+    public static function remove($k)
+    {
+        unset(self::$things[$k]);
+    }
 }

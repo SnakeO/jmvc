@@ -20,10 +20,15 @@ JMVC brings the Model-View-Controller pattern to WordPress, enabling developers 
   - [Libraries](#libraries)
   - [Configuration](#configuration)
 - [Routing](#routing)
+- [REST API](#rest-api)
+- [Security Features](#security-features)
+- [Environment Configuration](#environment-configuration)
 - [Sample Application: Task Manager](#sample-application-task-manager)
 - [Developer Tools](#developer-tools)
 - [HMVC Modules](#hmvc-modules)
 - [API Reference](#api-reference)
+- [Testing](#testing)
+- [Migration Guide](#migration-guide)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -35,19 +40,26 @@ JMVC brings the Model-View-Controller pattern to WordPress, enabling developers 
 - **WordPress Integration** - Native support for custom post types and WordPress APIs
 - **ACF Integration** - Seamless Advanced Custom Fields support via traits
 - **AJAX Routing** - Built-in URL routing through WordPress AJAX handlers
+- **REST API Support** - Modern REST API endpoints alongside AJAX routing
 - **HMVC Support** - Build modular, self-contained components
 - **API Development** - Ready-to-use base controller for JSON APIs
 - **Developer Tools** - Logging (JLog) and error alerting (DevAlert) built-in
 - **Key-Value Store** - Redis or SQLite backend for caching and sessions
 - **Flexible Configuration** - Centralized config management with nested access
+- **Security Built-in** - Nonce verification, CSRF protection, input sanitization, and output escaping
 
 ---
 
 ## Requirements
 
-- **PHP** 5.4 or higher
-- **WordPress** 4.0 or higher
+- **PHP** 7.4 or higher (8.1+ recommended)
+- **WordPress** 6.0 or higher
 - **Composer** for dependency management
+
+### Dependencies
+
+- **Guzzle** ^7.0 - HTTP client
+- **Predis** ^2.0 - Redis client (optional)
 
 ### Optional (Recommended)
 
@@ -711,6 +723,204 @@ Example:
 ```
 
 This loads `modules/blog/controllers/pub/PostController.php` and calls `show(42)`.
+
+---
+
+## REST API
+
+JMVC provides a modern REST API alongside the traditional AJAX routing system.
+
+### Endpoint Format
+
+```
+/wp-json/jmvc/v1/{env}/{controller}/{action}/{params}
+```
+
+### Examples
+
+| Method | URL | Description |
+|--------|-----|-------------|
+| GET | `/wp-json/jmvc/v1/pub/Task/index` | List all tasks |
+| GET | `/wp-json/jmvc/v1/pub/Task/show/42` | Get task by ID |
+| POST | `/wp-json/jmvc/v1/pub/Task/create` | Create a task |
+| POST | `/wp-json/jmvc/v1/admin/User/update/5` | Update user (admin only) |
+
+### Authentication
+
+For admin endpoints, requests require authentication. Include the nonce in the `X-WP-Nonce` header:
+
+```javascript
+fetch('/wp-json/jmvc/v1/admin/User/list', {
+    headers: {
+        'X-WP-Nonce': wpApiSettings.nonce
+    }
+});
+```
+
+### Using Both AJAX and REST API
+
+The REST API uses the same controllers as AJAX routing:
+
+```php
+// controllers/pub/TaskController.php works for both:
+// - AJAX: /wp-admin/admin-ajax.php?action=pub_controller&path=Task/index
+// - REST: /wp-json/jmvc/v1/pub/Task/index
+```
+
+---
+
+## Security Features
+
+JMVC includes comprehensive security features to protect your application.
+
+### Nonce Verification
+
+All AJAX and REST requests can be protected with nonces:
+
+```php
+// In your controller
+class TaskController extends APIController {
+
+    public function create() {
+        // Verify nonce for form submissions
+        $nonce = sanitize_text_field($_REQUEST['_jmvc_nonce'] ?? '');
+        if (!wp_verify_nonce($nonce, 'jmvc_ajax_nonce')) {
+            $this->api_die('Security check failed');
+        }
+
+        // ... create task
+    }
+}
+```
+
+Generate nonces in your forms:
+
+```php
+<form method="POST">
+    <input type="hidden" name="_jmvc_nonce" value="<?php echo wp_create_nonce('jmvc_ajax_nonce'); ?>">
+    <!-- form fields -->
+</form>
+```
+
+### Capability Checks
+
+Always verify user capabilities before performing actions:
+
+```php
+public function delete($id) {
+    if (!current_user_can('delete_posts')) {
+        $this->api_die('Permission denied');
+    }
+
+    // ... delete logic
+}
+```
+
+### Input Sanitization
+
+JMVC automatically sanitizes path parameters. Always sanitize user input:
+
+```php
+// Text input
+$title = sanitize_text_field($_POST['title']);
+
+// Email
+$email = sanitize_email($_POST['email']);
+
+// File names
+$filename = sanitize_file_name($_POST['filename']);
+
+// Integer values
+$id = absint($_POST['id']);
+
+// Textarea/multiline
+$content = sanitize_textarea_field($_POST['content']);
+```
+
+### Output Escaping
+
+Always escape output to prevent XSS attacks:
+
+```php
+// In views
+<h1><?php echo esc_html($title); ?></h1>
+<a href="<?php echo esc_url($link); ?>">Link</a>
+<input value="<?php echo esc_attr($value); ?>">
+<?php echo wp_kses_post($html_content); ?>
+```
+
+### JSONP Callback Sanitization
+
+JSONP callbacks are automatically sanitized to prevent injection:
+
+```php
+// Callback is sanitized to alphanumeric + $ + _ only
+$callback = preg_replace('/[^a-zA-Z0-9_\$]/', '', $_REQUEST['callback']);
+```
+
+### Path Traversal Prevention
+
+All file paths are validated to prevent directory traversal attacks:
+
+```php
+// Paths are validated using realpath()
+$real_path = realpath($path);
+$real_base = realpath($base_dir);
+
+if ($real_path === false || strpos($real_path, $real_base) !== 0) {
+    throw new Exception('Invalid path');
+}
+```
+
+---
+
+## Environment Configuration
+
+JMVC supports environment variables for sensitive configuration.
+
+### Available Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `JMVC_SLACK_WEBHOOK` | Slack webhook URL for DevAlert | (none) |
+| `JMVC_DEVALERT_EMAIL` | Email address for DevAlert | (none) |
+| `JMVC_SLACK_CHANNEL` | Slack channel for alerts | `#errors` |
+| `JMVC_SLACK_USERNAME` | Slack bot username | `JMVC Alert` |
+
+### Setting Environment Variables
+
+**Using .env file** (with vlucas/phpdotenv):
+
+```bash
+JMVC_SLACK_WEBHOOK=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+JMVC_DEVALERT_EMAIL=developer@example.com
+JMVC_SLACK_CHANNEL=#alerts
+```
+
+**Using wp-config.php**:
+
+```php
+define('JMVC_SLACK_WEBHOOK', 'https://hooks.slack.com/services/...');
+define('JMVC_DEVALERT_EMAIL', 'developer@example.com');
+```
+
+**Using server environment**:
+
+```bash
+export JMVC_SLACK_WEBHOOK="https://hooks.slack.com/services/..."
+```
+
+### Accessing Configuration
+
+```php
+// Get config with fallback
+$webhook = jmvc_get_config('JMVC_SLACK_WEBHOOK', 'default_value');
+
+// Check if configured
+if ($webhook = jmvc_get_config('JMVC_SLACK_WEBHOOK')) {
+    // Send alert
+}
+```
 
 ---
 
@@ -2457,6 +2667,137 @@ JView::show('posts/single', ['post' => $post], 'blog');
 
 ---
 
+## Testing
+
+JMVC includes a comprehensive PHPUnit test suite.
+
+### Running Tests
+
+```bash
+# Install PHPUnit
+composer require --dev phpunit/phpunit
+
+# Run all tests
+./vendor/bin/phpunit
+
+# Run specific test suite
+./vendor/bin/phpunit --testsuite Unit
+./vendor/bin/phpunit --testsuite Integration
+
+# Run with coverage
+./vendor/bin/phpunit --coverage-html coverage/
+```
+
+### Test Structure
+
+```
+tests/
+├── bootstrap.php              # Test bootstrap
+├── Unit/
+│   ├── Controller/
+│   │   ├── JControllerTest.php
+│   │   ├── JControllerAjaxTest.php
+│   │   └── APIControllerTest.php
+│   ├── Model/
+│   │   ├── JModelBaseTest.php
+│   │   └── ACFModelTraitTest.php
+│   ├── View/
+│   │   └── JViewTest.php
+│   └── Service/
+│       └── JBagTest.php
+├── Integration/
+│   └── SecurityTest.php
+└── Mocks/
+    ├── WordPressMocks.php
+    └── ACFMocks.php
+```
+
+### Writing Tests
+
+```php
+use PHPUnit\Framework\TestCase;
+use WP_Mock_Data;
+
+class MyControllerTest extends TestCase
+{
+    protected function setUp(): void
+    {
+        WP_Mock_Data::reset();
+    }
+
+    public function testUserCanAccessResource(): void
+    {
+        WP_Mock_Data::setLoggedIn(1, ['edit_posts']);
+
+        $this->assertTrue(current_user_can('edit_posts'));
+    }
+}
+```
+
+---
+
+## Migration Guide
+
+### Upgrading from Legacy JMVC
+
+If upgrading from an older version of JMVC, note these breaking changes:
+
+#### PHP Requirements
+
+- **Old**: PHP 5.4+
+- **New**: PHP 7.4+ (8.1+ recommended)
+
+Update your code to use modern PHP features:
+
+```php
+// Old (PHP 5.4)
+$value = isset($array['key']) ? $array['key'] : 'default';
+
+// New (PHP 7.0+)
+$value = $array['key'] ?? 'default';
+```
+
+#### WordPress Requirements
+
+- **Old**: WordPress 4.0+
+- **New**: WordPress 6.0+
+
+#### Dependencies
+
+Update your `composer.json`:
+
+```json
+{
+    "require": {
+        "php": ">=7.4",
+        "guzzlehttp/guzzle": "^7.0",
+        "predis/predis": "^2.0"
+    }
+}
+```
+
+Then run:
+
+```bash
+composer update
+```
+
+#### Security Changes
+
+1. **Nonce Verification**: AJAX controllers now support nonce verification. Add nonces to your forms.
+
+2. **Capability Checks**: Model `add()` and `update()` methods now check `edit_posts` capability.
+
+3. **Input Sanitization**: All path parameters are now sanitized. Update any code that relied on raw input.
+
+4. **Credentials**: Move any hardcoded credentials to environment variables.
+
+#### REST API
+
+New REST API endpoints are available at `/wp-json/jmvc/v1/`. You can use both AJAX and REST APIs - they share the same controllers.
+
+---
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
@@ -2466,6 +2807,20 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 3. Commit your changes (`git commit -m 'Add some amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+### Development Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/your-repo/jmvc.git
+cd jmvc
+
+# Install dependencies
+composer install
+
+# Run tests
+./vendor/bin/phpunit
+```
 
 ---
 

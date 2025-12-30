@@ -1,7 +1,13 @@
 <?php
-/*
-	JMVC - Utility Functions
-*/
+/**
+ * JMVC - Utility Functions
+ *
+ * @package JMVC
+ */
+
+if (!defined('ABSPATH')) {
+    exit;
+}
 
 // http://wpeden.com/tipsntuts/how-to-get-logged-in-users-role-in-wordpress/
 // if $id is not passed in, it will get the user role of the logged in user
@@ -30,21 +36,44 @@ function wp_site_url($url)
 	return site_url($url);
 }
 
-// let's us know if the user is a page admin
+/**
+ * Check if current user is a page admin
+ *
+ * @return bool True if user is a page admin
+ */
 function is_page_admin()
 {
+	if (!is_user_logged_in()) {
+		return false;
+	}
+
+	if (is_super_admin()) {
+		return true;
+	}
+
+	if (is_user_member_of_blog(get_current_user_id(), App::$d->promo->wp_blog_id)) {
+		return true;
+	}
+
 	$ci = &get_instance();
-	return (is_user_logged_in() && is_user_member_of_blog(get_current_user_id(), App::$d->promo->wp_blog_id)) || (@$_GET['snakeo'] == 'letmein') || $ci->fb->isAdmin() || is_super_admin();
+	if (isset($ci->fb) && $ci->fb->isAdmin()) {
+		return true;
+	}
+
+	return false;
 }
 
+/**
+ * Get the current domain/subdomain
+ *
+ * @return string|false Domain name or false on failure
+ */
 function get_current_domain()
 {
-	// get current domain
-	$blog_url = get_bloginfo('url');
+	$blog_url = home_url();
 	preg_match('/https?:\/\/([^\.]+)/', $blog_url, $matches);
 
-	if( !$matches[1] ) 
-	{
+	if (empty($matches[1])) {
 		return false;
 	}
 
@@ -113,62 +142,64 @@ function short_url($url)
 	return file_get_contents("http://sht.tl/api.php?action=shorten&response=plain&longUrl=" . urlencode($url));
 }
 
-// sign in a user
+/**
+ * Sign in a user programmatically
+ *
+ * @param WP_User $user The user object to authenticate
+ * @throws Exception If user is not valid
+ */
 function auth_user($user)
 {
-	if( !$user->ID ) {
+	if (empty($user->ID)) {
 		throw new Exception("auth_user: user is not valid");
 	}
 
-//	wp_logout();
+	// Clear existing WordPress cookies
+	jmvc_clear_wp_cookies();
 
-	// get rid of all wordpress login cookies. Sometimes cookies on the base domain can interfere.
-	if (isset($_SERVER['HTTP_COOKIE'])) 
-	{
-		$cookies = explode(';', $_SERVER['HTTP_COOKIE']);
-    	foreach($cookies as $cookie) 
-    	{
-			$parts = explode('=', $cookie);
-			$name = trim($parts[0]);
-			
-			if( stripos($name, 'wp-') !== false || stripos($name, 'wordpress') !== false )
-			{
-				$my_domain = '.' . $_SERVER['SERVER_NAME'];
+	wp_set_current_user($user->ID);
 
-				setcookie($name, '', 1);
-				setcookie($name, '', 1, null, '.etsythemeshop.com');
-				setcookie($name, '', 1, null, $my_domain);
+	// Set auth cookies for both HTTP and HTTPS
+	wp_set_auth_cookie($user->ID, true, false);
+	wp_set_auth_cookie($user->ID, true, true);
 
-				setcookie($name, '', 1, '/');
-				setcookie($name, '', 1, '/', '.etsythemeshop.com');
-				setcookie($name, '', 1, null, $my_domain);
+	do_action('wp_login', $user->user_login, $user);
+}
 
-				setcookie($name, '', 1, '/wp-admin');
-				setcookie($name, '', 1, '/wp-admin', '.etsythemeshop.com');
-				setcookie($name, '', 1, null, $my_domain);
+/**
+ * Clear WordPress authentication cookies
+ *
+ * @return void
+ */
+function jmvc_clear_wp_cookies()
+{
+	if (!isset($_SERVER['HTTP_COOKIE'])) {
+		return;
+	}
 
-				setcookie($name, '', 1, '/wp-login');
-				setcookie($name, '', 1, '/wp-login', '.etsythemeshop.com');
-				setcookie($name, '', 1, null, $my_domain);
+	$cookies = explode(';', $_SERVER['HTTP_COOKIE']);
+	$my_domain = isset($_SERVER['SERVER_NAME']) ? '.' . sanitize_text_field($_SERVER['SERVER_NAME']) : '';
+	$site_domain = wp_parse_url(home_url(), PHP_URL_HOST);
+	$cookie_domain = $site_domain ? '.' . $site_domain : '';
+
+	$paths = array('/', '/wp-admin', '/wp-login');
+
+	foreach ($cookies as $cookie) {
+		$parts = explode('=', $cookie, 2);
+		$name = trim($parts[0]);
+
+		if (stripos($name, 'wp-') !== false || stripos($name, 'wordpress') !== false) {
+			foreach ($paths as $path) {
+				setcookie($name, '', 1, $path);
+				if ($cookie_domain) {
+					setcookie($name, '', 1, $path, $cookie_domain);
+				}
+				if ($my_domain && $my_domain !== $cookie_domain) {
+					setcookie($name, '', 1, $path, $my_domain);
+				}
 			}
 		}
-
-		// die();
 	}
-
-	wp_set_current_user( $user->ID );
-
-	// both http: and https://
-	wp_set_auth_cookie( $user->ID, true, false);
-	wp_set_auth_cookie( $user->ID, true, true);
-//	wp_set_auth_cookie( $user->ID );
-
-	do_action( 'wp_login', $user->user_login );
-
-	if (isset($_GET['cookie']) )  {
-	//	die();
-	}
-
 }
 
 /*

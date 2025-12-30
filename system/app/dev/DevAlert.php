@@ -1,156 +1,234 @@
 <?php
+/**
+ * JMVC Developer Alert System
+ *
+ * Sends alerts to Slack or email for debugging and error tracking.
+ *
+ * @package JMVC
+ */
+
+if (!defined('ABSPATH')) {
+    exit;
+}
 
 use GuzzleHttp\Client as Guzzle;
 
 class DevAlert
 {
-	static $promises = array();
+    /**
+     * Pending async promises
+     *
+     * @var array
+     */
+    public static $promises = array();
 
-	/**
-	 * Send an alert out to the site admins
-	 *
-	 * @param  string $topic
-	 * @param  mixed $deets The details of error message to send
-	 * @return void
-	 */
-	public static function mail($topic, $deets='')
-	{
-		$body = DevAlert::constructBody($topic, $deets);
-		wp_mail(JConfig::$config['devalert']['mail']['email'], $topic, $body);
-	}
+    /**
+     * Send an alert out to the site admins via email
+     *
+     * @param string $topic Alert subject
+     * @param mixed $deets Details of error message
+     */
+    public static function mail($topic, $deets = '')
+    {
+        $body = self::constructBody($topic, $deets);
+        $email = JConfig::get('devalert/mail/email');
 
-	/**
-	 * Make sure that all async DevAlert's have gone out
-	 */
-	public static function waitForPromises()
-	{
-		foreach(DevAlert::$promises as $promise) {
-			$promise->wait();
-		}
-	}
+        if ($email) {
+            wp_mail(sanitize_email($email), sanitize_text_field($topic), $body);
+        }
+    }
 
-	/**
-	 * Send slack alert out to the site admins
-	 *
-	 * @param  string $topic
-	 * @param  mixed $deets The details of error message to send
-	 * @return void
-	 */
-	public static function slack($topic, $deets='')
-	{
-		// Instantiate with defaults, so all messages created
-		// will be sent from 'Cyril' and to the #accounting channel
-		// by default. Any names like @regan or #channel will also be linked.
-		$settings = [
-			'username' => JConfig::$config['devalert']['slack']['username'],
-			'channel' => JConfig::$config['devalert']['slack']['channel'],
-			'link_names' => true
-		];
+    /**
+     * Wait for all async DevAlert promises to complete
+     */
+    public static function waitForPromises()
+    {
+        foreach (self::$promises as $promise) {
+            try {
+                $promise->wait();
+            } catch (Exception $e) {
+                // Log but don't throw - we don't want alert failures to break the app
+                error_log('DevAlert promise failed: ' . $e->getMessage());
+            }
+        }
+    }
 
-		$guzzle = new Guzzle;
-		$endpoint = JConfig::$config['devalert']['slack']['endpoint'];
+    /**
+     * Send slack alert out to the site admins
+     *
+     * @param string $topic Alert subject
+     * @param mixed $deets Details of error message
+     */
+    public static function slack($topic, $deets = '')
+    {
+        try {
+            $slack_config = JConfig::get('devalert/slack');
 
-		$client = new Maknz\Slack\Client($endpoint, $settings, $guzzle);
-		$body = DevAlert::constructBody($topic, $deets);
+            if (empty($slack_config['endpoint'])) {
+                error_log('DevAlert: Slack endpoint not configured');
+                return;
+            }
 
-		// $client->send($body);
-		
-		// send async instead
-		$message = $client->createMessage();
-		$message->setText($body);
+            $settings = array(
+                'username'   => $slack_config['username'] ?? 'JMVC Alert',
+                'channel'    => $slack_config['channel'] ?? '#devalerts',
+                'link_names' => true,
+            );
 
-		$payload = $client->preparePayload($message);
-		$encoded = json_encode($payload, JSON_UNESCAPED_UNICODE);
-		DevAlert::$promises[] = $guzzle->requestAsync('POST', $endpoint, ['body' => $encoded]);
-	}
+            $guzzle = new Guzzle();
+            $endpoint = $slack_config['endpoint'];
 
-	/**
-	 * Send an alert out to the site admins (facade for easy switching between mail and slack)
-	 *
-	 * @param  string $topic
-	 * @param  mixed $deets The details of error message to send
-	 * @return void
-	 */
-	public static function send($topic, $deets)
-	{
-		DevAlert::slack($topic, $deets);
-	}
+            $client = new Maknz\Slack\Client($endpoint, $settings, $guzzle);
+            $body = self::constructBody($topic, $deets);
 
-	public static function init()
-	{
-		register_shutdown_function(array('DevAlert', 'waitForPromises'));
+            // Send async
+            $message = $client->createMessage();
+            $message->setText($body);
 
-		add_action('wp_ajax_devalert', function()
-		{
-			$kvstore = JBag::get('kvstore');
-			$res = $kvstore->get(@$_GET['id']);
-			echo $res ?: "devalert not found";
+            $payload = $client->preparePayload($message);
+            $encoded = wp_json_encode($payload);
 
-			die();
-		});
-	}
+            self::$promises[] = $guzzle->requestAsync('POST', $endpoint, array('body' => $encoded));
+        } catch (Exception $e) {
+            error_log('DevAlert Slack error: ' . $e->getMessage());
+        }
+    }
 
-	private static function constructBody($topic, $deets='')
-	{
-		$uid = uniqid('devalert_', true);
+    /**
+     * Send an alert (facade for easy switching between mail and slack)
+     *
+     * @param string $topic Alert subject
+     * @param mixed $deets Details of error message
+     */
+    public static function send($topic, $deets = '')
+    {
+        self::slack($topic, $deets);
+    }
 
-		$deets_output = $deets;
+    /**
+     * Initialize the DevAlert system
+     */
+    public static function init()
+    {
+        register_shutdown_function(array(__CLASS__, 'waitForPromises'));
 
-		if( $deets instanceof Exception ) {
-			$deets = (array)$deets;
-		}
+        add_action('wp_ajax_devalert', array(__CLASS__, 'ajax_handler'));
+    }
 
-		// convenient to pass in an array with the keys as the headings and value as the content
-		if( is_array($deets) ) {
+    /**
+     * Handle AJAX requests for devalert viewing
+     */
+    public static function ajax_handler()
+    {
+        // Only admins can view dev alerts
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'Unauthorized'), 403);
+            exit;
+        }
 
-			$deets_output = '';
+        $kvstore = JBag::get('kvstore');
+        $id = isset($_GET['id']) ? sanitize_text_field($_GET['id']) : '';
 
-			foreach($deets as $heading => $content) {
+        if (empty($id)) {
+            wp_send_json_error(array('message' => 'No ID specified'), 400);
+            exit;
+        }
 
-				if( !is_string($content) ) {
-					$content = print_r($content, true);
-				}
+        $res = $kvstore->get($id);
 
-				$deets_output .= "\n\n=======$heading======\n$content";
-			}
-		}
+        if ($res) {
+            // Output is HTML content stored by constructBody
+            echo wp_kses_post($res);
+        } else {
+            echo esc_html('DevAlert not found');
+        }
 
-		$msg = "<pre>";
+        exit;
+    }
 
-		// topic + details
-		$msg .= "$topic\n\n";
-		$msg .= $deets_output;
+    /**
+     * Construct the alert body with debugging information
+     *
+     * @param string $topic Alert subject
+     * @param mixed $deets Details of error message
+     * @return string Formatted message body
+     */
+    private static function constructBody($topic, $deets = '')
+    {
+        $uid = uniqid('devalert_', true);
 
-		// add in global stuff that's helpful
-		$msg .= "\n\n=========URL==========\n";
-		$msg .= @$_SERVER['REQUEST_METHOD'] . ' http://' . @$_SERVER['HTTP_HOST'] . @$_SERVER['REQUEST_URI'] . "\n"; // suppress errors for cli
-		$msg .= "referrer: " . @$_SERVER['HTTP_REFERER'];
-		$msg .= "\n\n=========HEADERS==========\n";
-		$msg .= getallheaders();
-		$msg .= "\n\n=========GET==========\n";
-		$msg .= print_r($_GET, true);
-		$msg .= "\n\n=========POST==========\n";
-		$msg .= print_r($_POST, true);
-		$msg .= "\n\n=======CALL STACK=======\n";
-		$msg .= print_r(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS), true);
-		$msg .= "\n\n==========SESSION==========\n";
-		$msg .= "id: " . session_id() . "\n\n";
-		$msg .= print_r(@$_SESSION, true);
-		$msg .= "\n\n==========COOKIES==========\n";
-		$msg .= "id: " . print_r($_COOKIE, true) . "\n\n";
-		$msg .= "\n\n==========CURRENT BLOG ID==========\n";
-		$msg .= get_current_blog_id() . "\n\n";
-		$msg .= "\n\n==========CURRENT USER ID==========\n";
-		$msg .= get_current_user_id() . "\n\n";
-		$msg .= "\n\n==========BROWSER==========\n";
-		$msg .= print_r(@get_browser(), true) . "\n\n";
+        $deets_output = $deets;
 
-		$msg .= "</pre>";
+        if ($deets instanceof Exception) {
+            $deets_output = array(
+                'message' => $deets->getMessage(),
+                'file'    => $deets->getFile(),
+                'line'    => $deets->getLine(),
+                'trace'   => $deets->getTraceAsString(),
+            );
+        }
 
-		// save encrypted msg to kvstore memory
-		$kvstore = JBag::get('kvstore');
-		$kvstore->set($uid, $msg);
+        // Convenient to pass in an array with the keys as the headings
+        if (is_array($deets_output)) {
+            $formatted = '';
+            foreach ($deets_output as $heading => $content) {
+                if (!is_string($content)) {
+                    $content = print_r($content, true);
+                }
+                $formatted .= "\n\n=======" . esc_html($heading) . "======\n" . esc_html($content);
+            }
+            $deets_output = $formatted;
+        } else {
+            $deets_output = esc_html($deets_output);
+        }
 
-		return "$topic\n\n" . admin_url( "admin-ajax.php?action=devalert&id=$uid" );
-	}
+        $msg = '<pre>';
+
+        // Topic + details
+        $msg .= esc_html($topic) . "\n\n";
+        $msg .= $deets_output;
+
+        // Add in global debugging info (sanitized)
+        $request_method = isset($_SERVER['REQUEST_METHOD']) ? sanitize_text_field($_SERVER['REQUEST_METHOD']) : 'CLI';
+        $http_host = isset($_SERVER['HTTP_HOST']) ? sanitize_text_field($_SERVER['HTTP_HOST']) : '';
+        $request_uri = isset($_SERVER['REQUEST_URI']) ? esc_url_raw($_SERVER['REQUEST_URI']) : '';
+        $referer = isset($_SERVER['HTTP_REFERER']) ? esc_url_raw($_SERVER['HTTP_REFERER']) : '';
+
+        $msg .= "\n\n=========URL==========\n";
+        $msg .= esc_html($request_method . ' ' . $http_host . $request_uri) . "\n";
+        $msg .= 'referrer: ' . esc_html($referer);
+
+        $msg .= "\n\n=========HEADERS==========\n";
+        if (function_exists('getallheaders')) {
+            $headers = getallheaders();
+            // Remove sensitive headers
+            unset($headers['Cookie'], $headers['Authorization']);
+            $msg .= esc_html(print_r($headers, true));
+        }
+
+        $msg .= "\n\n=========GET==========\n";
+        $msg .= esc_html(print_r(array_map('sanitize_text_field', $_GET), true));
+
+        $msg .= "\n\n=========POST (keys only)==========\n";
+        $msg .= esc_html(print_r(array_keys($_POST), true));
+
+        $msg .= "\n\n=======CALL STACK=======\n";
+        $msg .= esc_html(print_r(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS), true));
+
+        $msg .= "\n\n==========CURRENT BLOG ID==========\n";
+        $msg .= esc_html(get_current_blog_id()) . "\n\n";
+
+        $msg .= "\n\n==========CURRENT USER ID==========\n";
+        $msg .= esc_html(get_current_user_id()) . "\n\n";
+
+        $msg .= '</pre>';
+
+        // Save msg to kvstore memory
+        $kvstore = JBag::get('kvstore');
+        if ($kvstore) {
+            $kvstore->set($uid, $msg);
+        }
+
+        return esc_html($topic) . "\n\n" . esc_url(admin_url('admin-ajax.php?action=devalert&id=' . urlencode($uid)));
+    }
 }

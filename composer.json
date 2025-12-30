@@ -1,47 +1,32 @@
 {
-	"name": "jmvc/jmvc_app",
-	"description": "Wordpress MVC framework",
-	"minimum-stability" :"dev",
-	"prefer-stable" : true,
+    "name": "jmvc/jmvc_app",
+    "description": "WordPress MVC Framework",
+    "type": "library",
+    "license": "MIT",
+    "minimum-stability": "stable",
+    "prefer-stable": true,
 
-	"authors": [
-		{
-			"name": "Jay See",
-			"email": ""
-		}
-	],
+    "authors": [
+        {
+            "name": "JMVC Contributors"
+        }
+    ],
 
-	"require": {
-		"guzzlehttp/guzzle": "~6.0",
-		"maknz/slack": "^1.7",
-		"predis/predis": "^1.0",
-		"mthenw/nosqlite": "*@stable"
-	},
+    "require": {
+        "php": ">=7.4",
+        "guzzlehttp/guzzle": "^7.0",
+        "predis/predis": "^2.0",
+        "mthenw/nosqlite": "*@stable"
+    },
 
-	"autoload": {
-		"classmap" : [
-			"app",
-			
-			"controllers/admin",
-			"controllers/pub",
-			"controllers/resource",
+    "require-dev": {
+        "phpunit/phpunit": "^10.0"
+    },
 
-			"libraries",
-			"libraries/plugins",
-			"models",
+    "autoload": {},
 
-			"system/app/dev",
-
-			"system/config",
-			"system/controller",
-			"system/library",
-			"system/model",
-			"system/view"
-		],
-
-		"files" : [
-			"system/JBag.php",
-			"system/helpers/utility.php"
-		]
-	}
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    }
 }

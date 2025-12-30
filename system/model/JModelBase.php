@@ -1,100 +1,195 @@
 <?php
+/**
+ * JMVC Base Model Class
+ *
+ * @package JMVC
+ */
+
+if (!defined('ABSPATH')) {
+    exit;
+}
 
 class JModelBase
 {
-	public $id;
-	public static $post_type;	// override this in subclasses
+    /**
+     * Post ID
+     *
+     * @var int|null
+     */
+    public $id;
 
-	protected $data = array();	// pod data used for saving/creating pods. values for Related fields are just integers pointing to the post_id
+    /**
+     * Post type - override in subclasses
+     *
+     * @var string
+     */
+    public static $post_type;
 
-	public function __construct($id=null)
-	{
-		if( !static::$post_type ) {
-			throw new Exception("No post_type specified for JModel: " . get_called_class());
-		}
+    /**
+     * Model data used for saving/creating
+     *
+     * @var array
+     */
+    protected $data = array();
 
-		if( $id ) {
-			$this->id = $id;
-		}
-		else {
-			// DevAlert::slack('No id passed in for model');
-		}
-	}
+    /**
+     * Constructor
+     *
+     * @param int|null $id The post ID
+     * @throws Exception If no post_type is specified
+     */
+    public function __construct($id = null)
+    {
+        if (empty(static::$post_type)) {
+            throw new Exception('No post_type specified for JModel: ' . get_called_class());
+        }
 
-	// find Models with the same filters as get_posts (but we pre-fill the post_type)
-	public static function find($filters=array())
-	{
-		$filters = array(
-			'post_type' 		=> static::$post_type,
-			'posts_per_page'	=> -1
-		) + $filters;
+        if ($id) {
+            $this->id = absint($id);
+        }
+    }
 
-		$classname = get_called_class();
-		return array_map(function($post) use ($classname)
-		{
-			return new $classname($post->ID);
-		}, get_posts($filters));
-	}
+    /**
+     * Find models matching filters
+     *
+     * Uses get_posts() with post_type pre-filled.
+     *
+     * @param array $filters Query filters
+     * @return array Array of model instances
+     */
+    public static function find($filters = array())
+    {
+        $filters = array_merge(array(
+            'post_type'      => static::$post_type,
+            'posts_per_page' => -1,
+        ), $filters);
 
-	// ourselves as a wordpress post
-	public function post($as=OBJECT)
-	{
-		return get_post($this->id, $as);
-	}
+        $classname = get_called_class();
 
-	// returns the post title
-	public function makePostTitle()
-	{
-		throw new Exception("JModelBase:: override makePostTitle()");
-	}
+        return array_map(function ($post) use ($classname) {
+            return new $classname($post->ID);
+        }, get_posts($filters));
+    }
 
-	// get an attribute from our corresponding wordpress post
-	public function getPostAttr($key)
-	{
-		$post = $this->post();
-		return @$post->$key;
-	}
+    /**
+     * Get the underlying WordPress post
+     *
+     * @param string $as Output type (OBJECT, ARRAY_A, or ARRAY_N)
+     * @return WP_Post|array|null The post object or array
+     */
+    public function post($as = OBJECT)
+    {
+        return get_post($this->id, $as);
+    }
 
-	public function save()
-	{
-		if( !$this->id ) 
-		{
-			$this->add();
-			return $this->id;
-		}
-		
-		$this->update();
-		return $this->id;
-	}
+    /**
+     * Generate post title - override in subclasses
+     *
+     * @return string The post title
+     * @throws Exception Must be overridden
+     */
+    public function makePostTitle()
+    {
+        throw new Exception('JModelBase: override makePostTitle()');
+    }
 
-	public function add()
-	{
-		// you'll find most of this implementaiton inside ACFModelTrait
-	}
+    /**
+     * Get an attribute from the WordPress post
+     *
+     * @param string $key The attribute key
+     * @return mixed The attribute value or null
+     */
+    public function getPostAttr($key)
+    {
+        $post = $this->post();
 
-	public function update()
-	{
-		// you'll find most of this implementaiton inside ACFModelTrait
-	}
+        if (!$post) {
+            return null;
+        }
 
-	// set pod data for saving/creating
-	public function __set($k, $v)
-	{
-		$this->data[$k] = $v;
-	}
+        return $post->$key ?? null;
+    }
 
-	public function __get($field)
-	{
-		// already set earlier in the lifetime of this script?
-		if( in_array($field, array_keys($this->data)) ) {
-			return $this->data[$field];
-		}
+    /**
+     * Save the model (add or update)
+     *
+     * @return int|false The post ID or false on failure
+     */
+    public function save()
+    {
+        if (!$this->id) {
+            $this->add();
+            return $this->id;
+        }
 
-		// is it in our post field?
-		if( $val = $this->getPostAttr($field) ) {
-			return $val;
-		}
+        $this->update();
+        return $this->id;
+    }
 
-		DevAlert::slack("JModelBase: __get() not found: $field");
-	}
+    /**
+     * Add a new post - override in subclass or use trait
+     *
+     * @return int|false The new post ID or false
+     */
+    public function add()
+    {
+        // Implementation in ACFModelTrait
+        return false;
+    }
+
+    /**
+     * Update the post - override in subclass or use trait
+     *
+     * @return bool Success status
+     */
+    public function update()
+    {
+        // Implementation in ACFModelTrait
+        return false;
+    }
+
+    /**
+     * Set model data
+     *
+     * @param string $k Key
+     * @param mixed $v Value
+     */
+    public function __set($k, $v)
+    {
+        $this->data[$k] = $v;
+    }
+
+    /**
+     * Get model data or post attribute
+     *
+     * @param string $field Field name
+     * @return mixed The field value or null
+     */
+    public function __get($field)
+    {
+        // Check data array first
+        if (array_key_exists($field, $this->data)) {
+            return $this->data[$field];
+        }
+
+        // Check post attribute
+        $val = $this->getPostAttr($field);
+        if ($val !== null) {
+            return $val;
+        }
+
+        // Field not found - return null instead of alerting for every access
+        return null;
+    }
+
+    /**
+     * Check if a field is set
+     *
+     * @param string $field Field name
+     * @return bool True if field exists
+     */
+    public function __isset($field)
+    {
+        return array_key_exists($field, $this->data) || $this->getPostAttr($field) !== null;
+    }
 }
