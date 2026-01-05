@@ -60,7 +60,6 @@ JMVC brings the Model-View-Controller pattern to WordPress, enabling developers 
 
 ### Dependencies
 
-- **Guzzle** ^7.0 - HTTP client
 - **Predis** ^2.0 - Redis client (optional)
 
 ### Optional (Recommended)
