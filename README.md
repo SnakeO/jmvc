@@ -124,39 +124,15 @@ git clone https://github.com/your-repo/jmvc.git
 
 ![JMVC Dashboard](.github/images/02-dashboard.png)
 
-### 4. Configure Rewrite Rules (if needed)
+### 4. Flush Permalinks
 
-The JMVC dashboard automatically tests if rewrite rules are working. If not, it will display server-specific instructions:
+JMVC uses WordPress's native Rewrite API - no manual server configuration needed.
 
-**Apache (.htaccess):**
+If routes aren't working after activation:
+1. Go to **Settings > Permalinks**
+2. Click **Save Changes** (this flushes rewrite rules)
 
-```apache
-# Add before WordPress rules
-# JMVC Controller Routing
-RewriteRule ^controller/(.*)$ /wp-admin/admin-ajax.php?action=pub_controller&path=$1 [L,QSA]
-RewriteRule ^admin_controller/(.*)$ /wp-admin/admin-ajax.php?action=admin_controller&path=$1 [L,QSA]
-RewriteRule ^resource_controller/(.*)$ /wp-admin/admin-ajax.php?action=resource_controller&path=$1 [L,QSA]
-
-# HMVC Module Routing
-RewriteRule ^hmvc_controller/(.*)$ /wp-admin/admin-ajax.php?action=hmvc_controller&path=$1 [L,QSA]
-```
-
-**NGINX:**
-
-```nginx
-# JMVC Controller Routing
-location /controller/ {
-    rewrite ^/controller/(.*)$ /wp-admin/admin-ajax.php?action=pub_controller&path=$1 last;
-}
-
-location /admin_controller/ {
-    rewrite ^/admin_controller/(.*)$ /wp-admin/admin-ajax.php?action=admin_controller&path=$1 last;
-}
-
-location /resource_controller/ {
-    rewrite ^/resource_controller/(.*)$ /wp-admin/admin-ajax.php?action=resource_controller&path=$1 last;
-}
-```
+That's it! Routes like `/controller/pub/Task/index` will work automatically on any server.
 
 ---
 
@@ -170,13 +146,13 @@ The main dashboard shows:
 
 - **Theme Status** - Active theme name and JMVC initialization status
 - **Dependencies** - Composer vendor folder status with install button
-- **Rewrite Rules** - Auto-test with server-specific instructions if not configured
+- **Rewrite Rules** - Auto-test with link to flush permalinks if needed
 - **Component Counts** - Number of controllers, models, and views
 
 **Actions:**
 - **Initialize JMVC** - Creates scaffolding directories in your theme
 - **Install Dependencies** - Runs `composer install` (or shows manual instructions)
-- **Test Rewrite** - Re-checks rewrite rule configuration
+- **Test Rewrite** - Re-checks if WordPress rewrite rules are active
 
 ### Settings (JMVC > Settings)
 

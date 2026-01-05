@@ -75,118 +75,23 @@ class RewriteTest
     }
 
     /**
-     * Get installation instructions based on server type
+     * Get instructions for fixing rewrite rules
      *
      * @return string
      */
     public static function getInstructions(): string
     {
-        $serverType = self::getServerType();
-
-        switch ($serverType) {
-            case 'apache':
-            case 'litespeed':
-                return self::getApacheInstructions();
-
-            case 'nginx':
-                return self::getNginxInstructions();
-
-            default:
-                return self::getGenericInstructions();
-        }
-    }
-
-    /**
-     * Get Apache/LiteSpeed .htaccess instructions
-     */
-    private static function getApacheInstructions(): string
-    {
-        $htaccessPath = ABSPATH . '.htaccess';
+        $permalinksUrl = admin_url('options-permalink.php');
 
         return <<<HTML
-<h4>Apache / LiteSpeed Instructions</h4>
-<p>Add the following rules to your <code>.htaccess</code> file (located at <code>{$htaccessPath}</code>),
-   <strong>before</strong> the WordPress rewrite rules:</p>
-<pre><code># JMVC Controller Routing
-&lt;IfModule mod_rewrite.c&gt;
-RewriteEngine On
-RewriteBase /
-
-# JMVC Clean URLs
-RewriteRule ^controller/(.*)$ /wp-admin/admin-ajax.php?action=pub_controller&path=$1 [L,QSA]
-RewriteRule ^admin_controller/(.*)$ /wp-admin/admin-ajax.php?action=admin_controller&path=$1 [L,QSA]
-RewriteRule ^resource_controller/(.*)$ /wp-admin/admin-ajax.php?action=resource_controller&path=$1 [L,QSA]
-
-# HMVC Module Routing
-RewriteRule ^hmvc_controller/(.*)$ /wp-admin/admin-ajax.php?action=hmvc_controller&path=$1 [L,QSA]
-&lt;/IfModule&gt;
-# END JMVC</code></pre>
-<p><strong>Note:</strong> Make sure <code>mod_rewrite</code> is enabled on your server.</p>
+<h4>Flush Permalinks Required</h4>
+<p>JMVC uses WordPress's native Rewrite API - no manual server configuration needed.</p>
+<p>To fix routing issues:</p>
+<ol>
+    <li>Go to <a href="{$permalinksUrl}"><strong>Settings → Permalinks</strong></a></li>
+    <li>Click <strong>Save Changes</strong> (this flushes rewrite rules)</li>
+</ol>
+<p>Routes like <code>/controller/pub/Task/index</code> will work automatically on any server.</p>
 HTML;
-    }
-
-    /**
-     * Get NGINX instructions
-     */
-    private static function getNginxInstructions(): string
-    {
-        return <<<HTML
-<h4>NGINX Instructions</h4>
-<p>Add the following location blocks to your NGINX configuration file (usually in <code>/etc/nginx/sites-available/</code>),
-   <strong>inside</strong> your server block:</p>
-<pre><code># JMVC Controller Routing
-location /controller/ {
-    rewrite ^/controller/(.*)$ /wp-admin/admin-ajax.php?action=pub_controller&path=$1 last;
-}
-
-location /admin_controller/ {
-    rewrite ^/admin_controller/(.*)$ /wp-admin/admin-ajax.php?action=admin_controller&path=$1 last;
-}
-
-location /resource_controller/ {
-    rewrite ^/resource_controller/(.*)$ /wp-admin/admin-ajax.php?action=resource_controller&path=$1 last;
-}
-
-# HMVC Module Routing
-location /hmvc_controller/ {
-    rewrite ^/hmvc_controller/(.*)$ /wp-admin/admin-ajax.php?action=hmvc_controller&path=$1 last;
-}</code></pre>
-<p><strong>After adding these rules, restart NGINX:</strong></p>
-<pre><code>sudo nginx -t && sudo systemctl reload nginx</code></pre>
-HTML;
-    }
-
-    /**
-     * Get generic instructions
-     */
-    private static function getGenericInstructions(): string
-    {
-        return <<<HTML
-<h4>Server Configuration Required</h4>
-<p>Your server type could not be detected. You need to configure URL rewriting to map:</p>
-<ul>
-    <li><code>/controller/{path}</code> → <code>/wp-admin/admin-ajax.php?action=pub_controller&path={path}</code></li>
-    <li><code>/admin_controller/{path}</code> → <code>/wp-admin/admin-ajax.php?action=admin_controller&path={path}</code></li>
-    <li><code>/resource_controller/{path}</code> → <code>/wp-admin/admin-ajax.php?action=resource_controller&path={path}</code></li>
-    <li><code>/hmvc_controller/{path}</code> → <code>/wp-admin/admin-ajax.php?action=hmvc_controller&path={path}</code></li>
-</ul>
-<p>Please consult your server's documentation for URL rewriting configuration.</p>
-HTML;
-    }
-
-    /**
-     * Check if .htaccess is writable (for Apache)
-     *
-     * @return bool
-     */
-    public static function isHtaccessWritable(): bool
-    {
-        $htaccessPath = ABSPATH . '.htaccess';
-
-        if (!file_exists($htaccessPath)) {
-            return is_writable(ABSPATH);
-        }
-
-        return is_writable($htaccessPath);
     }
 }
