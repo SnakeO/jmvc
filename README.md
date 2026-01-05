@@ -21,6 +21,8 @@ JMVC brings the Model-View-Controller pattern to WordPress, enabling developers 
   - [Libraries](#libraries)
   - [Configuration](#configuration)
 - [Routing](#routing)
+- [Page Controllers](#page-controllers)
+- [Gutenberg Blocks](#gutenberg-blocks)
 - [REST API](#rest-api)
 - [Security Features](#security-features)
 - [Environment Configuration](#environment-configuration)
@@ -272,6 +274,12 @@ JMVC splits between the plugin (framework core) and your theme (application code
 │   │   ├── JModelBase.php          # Base model class
 │   │   └── ACFModelTrait.php       # ACF integration
 │   ├── view/JView.php              # View renderer
+│   ├── routing/                    # WordPress Rewrite API routing
+│   │   ├── JRouter.php             # Rewrite rule registration
+│   │   └── JPageController.php     # Page controller base class
+│   ├── blocks/                     # Gutenberg block system
+│   │   ├── JBlock.php              # Block registration
+│   │   └── JBlockController.php    # Block controller base class
 │   └── app/dev/
 │       ├── JLog.php                # Logging
 │       └── DevAlert.php            # Error alerts
@@ -294,11 +302,14 @@ JMVC splits between the plugin (framework core) and your theme (application code
 │   └── resource/                   # Resource/API controllers
 ├── models/                         # MVC Models
 ├── views/                          # MVC Views (templates)
+│   └── blocks/                     # Block view templates
 ├── libraries/                      # Reusable service classes
 ├── modules/                        # HMVC modules (optional)
 ├── config/                         # Configuration files
 │   ├── devalert.php                # Alert settings
-│   └── kvstore.php                 # Key-value store config
+│   ├── kvstore.php                 # Key-value store config
+│   └── blocks.php                  # Gutenberg block registrations
+├── templates/                      # Page templates (for JView::showPage)
 ├── composer.json                   # Dependencies
 └── vendor/                         # Composer packages
 ```
@@ -815,6 +826,300 @@ Example:
 ```
 
 This loads `modules/blog/controllers/pub/PostController.php` and calls `show(42)`.
+
+### WordPress Native Routing
+
+JMVC supports native WordPress Rewrite API routing, which works automatically without manual server configuration. When you flush permalinks (Settings > Permalinks > Save Changes), JMVC registers URL rewrite rules directly with WordPress.
+
+**Native URL Patterns:**
+
+| Pattern | Description | Example |
+|---------|-------------|---------|
+| `/controller/{env}/{controller}/{action}` | Controller routes | `/controller/pub/Task/index` |
+| `/page/{controller}/{action}` | Page routes (theme-wrapped) | `/page/Demo/index` |
+
+![Native Routing](.github/images/06-native-routing.png)
+
+**Benefits:**
+- No `.htaccess` or NGINX configuration needed
+- Works on all hosting environments
+- Automatic activation on plugin enable
+- Falls back to REST API if needed
+
+**Flush permalinks** after installing or updating JMVC to register the rewrite rules:
+
+1. Go to **Settings > Permalinks**
+2. Click **Save Changes** (no changes needed)
+
+---
+
+## Page Controllers
+
+Page Controllers render full WordPress pages with theme integration (header/footer). This is ideal for building custom pages that feel native to WordPress.
+
+### Creating a Page Controller
+
+```php
+<?php
+// {theme}/jmvc/controllers/pub/ProductPageController.php
+
+class ProductPageController extends JPageController
+{
+    /**
+     * Product listing page
+     * URL: /page/ProductPage/index
+     */
+    public function index(): void
+    {
+        JModel::load('Product');
+        $products = Product::find(['posts_per_page' => 12]);
+
+        $this->setTitle('Our Products');
+        $this->addClass('products-page');
+        $this->view('products/listing', [
+            'products' => $products
+        ]);
+    }
+
+    /**
+     * Single product page
+     * URL: /page/ProductPage/show/42
+     */
+    public function show(int $id): void
+    {
+        JModel::load('Product');
+        $product = new Product($id);
+
+        if (!$product->ID) {
+            $this->setTitle('Product Not Found');
+            $this->view('errors/404');
+            return;
+        }
+
+        $this->setTitle($product->post_title);
+        $this->addClass('single-product');
+        $this->view('products/single', [
+            'product' => $product
+        ]);
+    }
+}
+```
+
+### Page View Template
+
+```php
+<?php // {theme}/jmvc/views/products/listing.php ?>
+<div class="products-container">
+    <h1>Our Products</h1>
+
+    <div class="products-grid">
+        <?php foreach ($products as $product): ?>
+            <div class="product-card">
+                <h3><?= esc_html($product->post_title) ?></h3>
+                <p><?= esc_html($product->excerpt) ?></p>
+                <a href="/page/ProductPage/show/<?= $product->ID ?>">View Details</a>
+            </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+```
+
+![Page Controller Output](.github/images/07-page-controller.png)
+
+### JPageController Methods
+
+| Method | Description |
+|--------|-------------|
+| `setTitle($title)` | Set the page `<title>` |
+| `addClass($class)` | Add CSS class to `<body>` |
+| `view($name, $data)` | Render view with theme wrapper |
+| `render($name, $data)` | Get view HTML as string |
+
+### JView::showPage()
+
+For more control, use `JView::showPage()` directly:
+
+```php
+JView::showPage('products/listing', $data, [
+    'title' => 'Our Products',
+    'body_class' => ['products-page', 'full-width'],
+    'template' => 'full-width'  // Uses templates/full-width.php
+]);
+```
+
+---
+
+## Gutenberg Blocks
+
+Create dynamic Gutenberg blocks powered by JMVC controllers. Blocks render server-side using `ServerSideRender`, providing live previews in the editor.
+
+### Registering Blocks
+
+Create `config/blocks.php` in your theme's jmvc directory:
+
+```php
+<?php
+// {theme}/jmvc/config/blocks.php
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+// Featured Products Block
+JBlock::register('jmvc/featured-products', [
+    'controller' => 'ProductBlock',
+    'action' => 'featured',
+    'title' => 'Featured Products',
+    'description' => 'Display featured products in a grid',
+    'category' => 'widgets',
+    'icon' => 'products',
+    'attributes' => [
+        'count' => [
+            'type' => 'number',
+            'default' => 4
+        ],
+        'columns' => [
+            'type' => 'number',
+            'default' => 2
+        ],
+        'showPrice' => [
+            'type' => 'boolean',
+            'default' => true
+        ]
+    ]
+]);
+
+// Call to Action Block
+JBlock::register('jmvc/cta', [
+    'controller' => 'CTABlock',
+    'action' => 'render',
+    'title' => 'Call to Action',
+    'description' => 'A customizable CTA section',
+    'category' => 'design',
+    'icon' => 'megaphone',
+    'attributes' => [
+        'heading' => [
+            'type' => 'string',
+            'default' => 'Get Started Today'
+        ],
+        'buttonText' => [
+            'type' => 'string',
+            'default' => 'Learn More'
+        ],
+        'buttonUrl' => [
+            'type' => 'string',
+            'default' => '#'
+        ],
+        'backgroundColor' => [
+            'type' => 'string',
+            'default' => '#0073aa'
+        ]
+    ]
+]);
+```
+
+### Block Controllers
+
+Extend `JBlockController` for block-specific functionality:
+
+```php
+<?php
+// {theme}/jmvc/controllers/pub/ProductBlockController.php
+
+class ProductBlockController extends JBlockController
+{
+    /**
+     * Render featured products block
+     */
+    public function featured(): string
+    {
+        $count = $this->attr('count', 4);
+        $columns = $this->attr('columns', 2);
+        $showPrice = $this->attr('showPrice', true);
+
+        JModel::load('Product');
+        $products = Product::find([
+            'posts_per_page' => $count,
+            'meta_query' => [
+                ['key' => 'featured', 'value' => '1']
+            ]
+        ]);
+
+        if (empty($products)) {
+            return $this->placeholder(
+                'No featured products found. Mark some products as featured.',
+                'products'
+            );
+        }
+
+        return $this->blockView('blocks/featured-products', [
+            'products' => $products,
+            'columns' => $columns,
+            'showPrice' => $showPrice
+        ]);
+    }
+}
+```
+
+### Block View Template
+
+```php
+<?php // {theme}/jmvc/views/blocks/featured-products.php ?>
+<div class="jmvc-featured-products columns-<?= esc_attr($columns) ?>">
+    <?php foreach ($products as $product): ?>
+        <div class="product-item">
+            <?php if ($product->thumbnail): ?>
+                <img src="<?= esc_url($product->thumbnail) ?>"
+                     alt="<?= esc_attr($product->post_title) ?>">
+            <?php endif; ?>
+
+            <h3><?= esc_html($product->post_title) ?></h3>
+
+            <?php if ($showPrice && $product->price): ?>
+                <p class="price">$<?= esc_html(number_format($product->price, 2)) ?></p>
+            <?php endif; ?>
+        </div>
+    <?php endforeach; ?>
+
+    <?php if ($isEditor): ?>
+        <p class="editor-note">Block preview - <?= count($products) ?> products shown</p>
+    <?php endif; ?>
+</div>
+```
+
+![Block in Editor](.github/images/08-block-editor.png)
+
+![Block Preview](.github/images/09-block-preview.png)
+
+### JBlockController Methods
+
+| Method | Description |
+|--------|-------------|
+| `attr($key, $default)` | Get block attribute value |
+| `attrs()` | Get all block attributes |
+| `hasAttr($key)` | Check if attribute exists and is not empty |
+| `content()` | Get inner block content |
+| `hasContent()` | Check if inner content exists |
+| `inEditor()` | Check if rendering in editor |
+| `onFrontend()` | Check if rendering on frontend |
+| `blockView($view, $data)` | Render a view with block context |
+| `placeholder($message, $icon)` | Render editor placeholder |
+| `loading($message)` | Render loading state |
+| `error($message)` | Render error message |
+| `wrap($content, $attrs)` | Wrap content with standard wrapper |
+
+### Block Registration Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `controller` | string | Controller name (without "Controller" suffix) |
+| `action` | string | Method to call for rendering |
+| `title` | string | Block title in inserter |
+| `description` | string | Block description |
+| `category` | string | Block category (text, media, design, widgets, theme, embed) |
+| `icon` | string | Dashicon name or SVG |
+| `attributes` | array | Block attributes with types and defaults |
+| `supports` | array | WordPress block supports (align, html, etc.) |
 
 ---
 
@@ -1405,8 +1710,45 @@ JView::show('posts/single', ['post' => $post], 'blog');
 
 | Method | Description |
 |--------|-------------|
-| `show($template, $data = [], $module = null)` | Output view |
-| `get($template, $data = [], $module = null)` | Return view as string |
+| `show($template, $data = [], $module = false)` | Output view |
+| `get($template, $data = [], $module = false)` | Return view as string |
+| `showPage($template, $data = [], $options = [], $module = false)` | Render view with theme header/footer |
+
+### JPageController
+
+| Method | Description |
+|--------|-------------|
+| `setTitle($title)` | Set page document title |
+| `addClass($class)` | Add CSS class to body element |
+| `view($name, $data = [], $module = false)` | Render view with theme wrapper |
+| `render($name, $data = [], $module = false)` | Get view HTML as string |
+
+### JBlockController
+
+| Method | Description |
+|--------|-------------|
+| `attr($key, $default = null)` | Get block attribute value |
+| `attrs()` | Get all block attributes |
+| `hasAttr($key)` | Check if attribute exists and is not empty |
+| `content()` | Get inner block content |
+| `hasContent()` | Check if inner content exists |
+| `inEditor()` | Check if rendering in editor context |
+| `onFrontend()` | Check if rendering on frontend |
+| `blockView($view, $data = [], $module = false)` | Render view with block context |
+| `placeholder($message, $icon = 'admin-post')` | Render editor placeholder |
+| `loading($message = '')` | Render loading state |
+| `error($message)` | Render error message |
+| `wrap($content, $wrapperAttrs = [])` | Wrap content with standard wrapper |
+| `getBlockWrapperAttributes($extra = [])` | Get WordPress block wrapper attributes |
+| `canEdit()` | Check if current user can edit |
+| `esc($content)` | Escape output for block content |
+| `kses($content)` | Allow limited HTML in output |
+
+### JBlock
+
+| Method | Description |
+|--------|-------------|
+| `register($name, $config)` | Register a Gutenberg block |
 
 ### JLib
 

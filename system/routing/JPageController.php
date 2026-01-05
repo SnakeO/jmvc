@@ -215,9 +215,9 @@ abstract class JPageController
      *
      * @param string $viewName View name
      * @param array<string, mixed> $data Data to pass to view
-     * @param string|null $module HMVC module name
+     * @param string|false $module HMVC module name or false for global scope
      */
-    protected function view(string $viewName, array $data = [], ?string $module = null): void
+    protected function view(string $viewName, array $data = [], string|false $module = false): void
     {
         JView::show($viewName, $data, $module);
     }
@@ -227,10 +227,10 @@ abstract class JPageController
      *
      * @param string $viewName View name
      * @param array<string, mixed> $data Data to pass to view
-     * @param string|null $module HMVC module name
+     * @param string|false $module HMVC module name or false for global scope
      * @return string Rendered view HTML
      */
-    protected function render(string $viewName, array $data = [], ?string $module = null): string
+    protected function render(string $viewName, array $data = [], string|false $module = false): string
     {
         return JView::get($viewName, $data, $module);
     }

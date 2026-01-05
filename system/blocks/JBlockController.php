@@ -123,10 +123,10 @@ abstract class JBlockController
      *
      * @param string $viewName View name (relative to views directory)
      * @param array<string, mixed> $data Additional data for view
-     * @param string|null $module HMVC module name
+     * @param string|false $module HMVC module name or false for global scope
      * @return string Rendered HTML
      */
-    protected function blockView(string $viewName, array $data = [], ?string $module = null): string
+    protected function blockView(string $viewName, array $data = [], string|false $module = false): string
     {
         // Merge in block context
         $data = array_merge([

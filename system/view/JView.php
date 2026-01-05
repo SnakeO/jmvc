@@ -47,23 +47,28 @@ class JView
         }
 
         // Sanitize view name to prevent directory traversal
-        $view = sanitize_file_name(str_replace('/', DIRECTORY_SEPARATOR, $view));
-        $view = str_replace(DIRECTORY_SEPARATOR, '/', $view);
+        // Split by directory separator, sanitize each part, then rejoin
+        $viewParts = array_filter(explode('/', $view), fn($part) => $part !== '' && $part !== '.' && $part !== '..');
+        $viewParts = array_map('sanitize_file_name', $viewParts);
+        $view = implode('/', $viewParts);
 
         $module = $force_module !== false ? $force_module : self::$module;
         $view_pathinfo = pathinfo($view);
 
+        // Base path for views (theme's jmvc directory)
+        $basePath = defined('JMVC') ? JMVC : dirname(__FILE__) . '/../../';
+
         // Check HMVC module first
         if ($module) {
             $module = sanitize_file_name($module);
-            $viewdir = dirname(__FILE__) . '/../../modules/' . $module . '/views';
+            $viewdir = $basePath . 'modules/' . $module . '/views';
             $fullview = $viewdir . '/' . $view . '.php';
             $view_url = JMVC_URL . 'modules/' . $module . '/views/' . ($view_pathinfo['dirname'] ? $view_pathinfo['dirname'] . '/' : '');
         }
 
         // If the module's view doesn't exist, try in the global scope
         if (!$module || !file_exists($fullview)) {
-            $viewdir = dirname(__FILE__) . '/../../views';
+            $viewdir = $basePath . 'views';
             $fullview = $viewdir . '/' . $view . '.php';
             $view_url = JMVC_URL . 'views/' . ($view_pathinfo['dirname'] ? $view_pathinfo['dirname'] . '/' : '');
         }
@@ -74,7 +79,7 @@ class JView
 
         // Verify the view file is within allowed directories
         $real_fullview = realpath($fullview);
-        $real_viewdir = realpath(dirname(__FILE__) . '/../../');
+        $real_viewdir = realpath($basePath);
         if ($real_fullview === false || strpos($real_fullview, $real_viewdir) !== 0) {
             throw new Exception('Invalid view path.');
         }
