@@ -1,0 +1,383 @@
+/**
+ * JMVC Admin Styles
+ */
+
+/* General */
+.jmvc-admin {
+    max-width: 1200px;
+}
+
+/* Dashboard Cards */
+.jmvc-status-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin: 20px 0;
+}
+
+.jmvc-card {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 20px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.jmvc-card h3 {
+    margin: 0 0 15px;
+    padding: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1d2327;
+}
+
+.jmvc-card.status-ok {
+    border-left: 4px solid #00a32a;
+}
+
+.jmvc-card.status-warning {
+    border-left: 4px solid #dba617;
+}
+
+.jmvc-card.status-error {
+    border-left: 4px solid #d63638;
+}
+
+.jmvc-card.status-disabled {
+    opacity: 0.6;
+}
+
+/* Status Indicator */
+.jmvc-status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 15px;
+    font-size: 14px;
+}
+
+.jmvc-status-indicator .dashicons {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+}
+
+.jmvc-status-indicator .dashicons-yes-alt {
+    color: #00a32a;
+}
+
+.jmvc-status-indicator .dashicons-warning {
+    color: #dba617;
+}
+
+.jmvc-status-indicator .dashicons-dismiss {
+    color: #d63638;
+}
+
+/* Theme Info */
+.jmvc-theme-name {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 5px;
+}
+
+.jmvc-theme-path {
+    margin: 0;
+    font-size: 12px;
+}
+
+.jmvc-theme-path code {
+    font-size: 11px;
+    word-break: break-all;
+}
+
+/* Stats */
+.jmvc-stats {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.jmvc-stats h2 {
+    margin: 0 0 15px;
+    font-size: 16px;
+}
+
+.jmvc-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-bottom: 15px;
+}
+
+.jmvc-stat {
+    text-align: center;
+    padding: 15px;
+    background: #f6f7f7;
+    border-radius: 4px;
+}
+
+.jmvc-stat-number {
+    display: block;
+    font-size: 32px;
+    font-weight: 600;
+    color: #2271b1;
+    line-height: 2.4em;
+}
+
+.jmvc-stat-label {
+    display: block;
+    font-size: 12px;
+    color: #646970;
+    text-transform: uppercase;
+}
+
+/* Instructions Panel */
+.jmvc-instructions {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-left: 4px solid #2271b1;
+    border-radius: 4px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.jmvc-instructions h2 {
+    margin: 0 0 15px;
+    font-size: 16px;
+}
+
+.jmvc-instructions pre {
+    background: #2c3338;
+    color: #fff;
+    padding: 15px;
+    border-radius: 4px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.jmvc-instructions code {
+    background: #f0f0f1;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.jmvc-instructions pre code {
+    background: transparent;
+    padding: 0;
+}
+
+/* Spinner */
+.jmvc-spinner {
+    animation: jmvc-spin 1s linear infinite;
+}
+
+@keyframes jmvc-spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Config Form */
+.jmvc-config-form {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.jmvc-config-section {
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #f0f0f1;
+}
+
+.jmvc-config-section:last-of-type {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.jmvc-config-section h2 {
+    margin: 0 0 5px;
+    font-size: 16px;
+}
+
+.jmvc-config-section > .description {
+    margin-bottom: 15px;
+    color: #646970;
+}
+
+.jmvc-config-info {
+    background: #f6f7f7;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 15px 20px;
+    margin: 20px 0;
+}
+
+.jmvc-config-info h3 {
+    margin: 0 0 10px;
+    font-size: 14px;
+}
+
+.jmvc-config-info ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.jmvc-config-info code {
+    font-size: 11px;
+    word-break: break-all;
+}
+
+.jmvc-save-status {
+    margin-left: 10px;
+    font-style: italic;
+    color: #646970;
+}
+
+.jmvc-save-status.success {
+    color: #00a32a;
+}
+
+.jmvc-save-status.error {
+    color: #d63638;
+}
+
+/* Browser */
+.jmvc-browser-content {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-top: none;
+    padding: 20px;
+}
+
+.jmvc-component-group {
+    margin-bottom: 30px;
+}
+
+.jmvc-component-group:last-child {
+    margin-bottom: 0;
+}
+
+.jmvc-component-group h3 {
+    margin: 0 0 10px;
+    font-size: 14px;
+}
+
+.jmvc-component-group h3 .count {
+    color: #646970;
+    font-weight: normal;
+}
+
+.jmvc-empty {
+    color: #646970;
+    font-style: italic;
+}
+
+.jmvc-browser-info {
+    margin-top: 20px;
+    color: #646970;
+}
+
+.jmvc-browser-info code {
+    font-size: 12px;
+}
+
+/* View Tree */
+.jmvc-view-tree {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.jmvc-tree {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.jmvc-tree ul {
+    margin-left: 20px;
+    padding: 0;
+    list-style: none;
+}
+
+.jmvc-tree li {
+    padding: 4px 0;
+}
+
+.jmvc-tree .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    vertical-align: middle;
+    color: #646970;
+}
+
+.jmvc-tree-folder > .dashicons {
+    color: #dba617;
+}
+
+.jmvc-tree-file > .dashicons {
+    color: #2271b1;
+}
+
+.jmvc-tree-date {
+    color: #a0a5aa;
+    font-size: 11px;
+    margin-left: 10px;
+}
+
+/* Notices */
+.jmvc-notices {
+    margin-top: 20px;
+}
+
+.jmvc-notice {
+    padding: 10px 15px;
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+
+.jmvc-notice.success {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.jmvc-notice.error {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+/* Button Loading State */
+.button.loading {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.button.loading::after {
+    content: "";
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    margin-left: 8px;
+    border: 2px solid #fff;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: jmvc-spin 0.8s linear infinite;
+    vertical-align: middle;
+}
+
+.button-primary.loading::after {
+    border-color: rgba(255, 255, 255, 0.5);
+    border-top-color: transparent;
+}
