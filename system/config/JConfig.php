@@ -67,4 +67,38 @@ class JConfig
 
         return $val;
     }
+
+    /**
+     * Get default routing configuration
+     *
+     * @return array<string, mixed> Routing defaults
+     */
+    public static function getRoutingDefaults(): array
+    {
+        return [
+            'use_rewrite_api' => true,       // Use WordPress Rewrite API for clean URLs
+            'legacy_ajax_support' => true,   // Keep wp_ajax_* handlers for backward compatibility
+            'default_render_mode' => 'api',  // 'api', 'page', or 'block'
+            'page_url_prefix' => 'page',     // URL prefix for page routes (/page/...)
+            'controller_url_prefix' => 'controller', // URL prefix for API routes (/controller/...)
+        ];
+    }
+
+    /**
+     * Get default block configuration
+     *
+     * @return array<string, mixed> Block defaults
+     */
+    public static function getBlockDefaults(): array
+    {
+        return [
+            'category' => 'jmvc-blocks',
+            'icon' => 'admin-generic',
+            'supports' => [
+                'html' => false,
+                'align' => ['wide', 'full'],
+                'anchor' => true,
+            ],
+        ];
+    }
 }

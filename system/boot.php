@@ -49,6 +49,15 @@ require_once JSYS . 'model/JModel.php';
 require_once JSYS . 'model/JModelBase.php';
 require_once JSYS . 'model/traits/ACFModelTrait.php';
 
+// Load routing system classes
+require_once JSYS . 'routing/JRewrite.php';
+require_once JSYS . 'routing/JControllerDispatcher.php';
+require_once JSYS . 'routing/JPageController.php';
+
+// Load block system classes
+require_once JSYS . 'blocks/JBlock.php';
+require_once JSYS . 'blocks/JBlockController.php';
+
 // Load APIController from plugin's controllers
 $apiController = JMVC_PLUGIN_PATH . 'controllers/pub/APIController.php';
 if (file_exists($apiController)) {
@@ -98,6 +107,18 @@ if (!empty($store_config['type'])) {
 JLog::init();
 JControllerAjax::init();
 DevAlert::init();
+
+// Initialize WordPress Rewrite API routing
+JRewrite::init();
+
+// Initialize Gutenberg block system
+JBlock::init();
+
+// Load blocks configuration from theme if exists
+$blocks_config = JMVC . 'config/blocks.php';
+if (file_exists($blocks_config)) {
+    require_once $blocks_config;
+}
 
 // Initialize REST API
 add_action('rest_api_init', 'jmvc_register_rest_routes');

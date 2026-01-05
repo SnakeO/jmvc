@@ -107,4 +107,70 @@ class JView
 
         return ob_get_clean() ?: '';
     }
+
+    /**
+     * Render view within WordPress theme (with header/footer)
+     *
+     * @param string $view View name
+     * @param array $data Data to pass to view
+     * @param array $options Rendering options (title, body_class, template)
+     * @param string|false $force_module Force specific module
+     */
+    public static function showPage(string $view, array $data = [], array $options = [], string|false $force_module = false): void
+    {
+        $defaults = [
+            'template' => null,      // Custom template file
+            'title' => '',           // Page title
+            'body_class' => [],      // Additional body classes
+        ];
+
+        $options = array_merge($defaults, $options);
+
+        // Capture view content
+        $content = self::get($view, $data, $force_module);
+
+        // Store content for template access
+        JBag::set('jmvc_page_content', $content);
+        JBag::set('jmvc_page_title', $options['title']);
+
+        // Add title filter
+        if (!empty($options['title'])) {
+            add_filter('document_title_parts', function ($title) use ($options) {
+                $title['title'] = $options['title'];
+                return $title;
+            });
+        }
+
+        // Add body classes
+        if (!empty($options['body_class'])) {
+            add_filter('body_class', function ($classes) use ($options) {
+                return array_merge($classes, (array) $options['body_class']);
+            });
+        }
+
+        // Use custom template or default
+        if (!empty($options['template'])) {
+            // Check theme's jmvc templates directory
+            $template_path = get_stylesheet_directory() . '/jmvc/templates/' . sanitize_file_name($options['template']) . '.php';
+
+            if (file_exists($template_path)) {
+                include $template_path;
+                return;
+            }
+
+            // Check plugin templates
+            $plugin_template = JMVC_PLUGIN_PATH . 'templates/' . sanitize_file_name($options['template']) . '.php';
+            if (file_exists($plugin_template)) {
+                include $plugin_template;
+                return;
+            }
+        }
+
+        // Default: wrap in theme header/footer
+        get_header();
+        echo '<main id="jmvc-content" class="jmvc-page-content">';
+        echo $content; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+        echo '</main>';
+        get_footer();
+    }
 }

@@ -5,7 +5,7 @@
  * Description: WordPress MVC Framework - Build structured, maintainable WordPress applications
  * Version: 2.0.0
  * Requires at least: 6.0
- * Requires PHP: 7.4
+ * Requires PHP: 8.0
  * Author: JMVC Contributors
  * License: MIT
  * Text Domain: jmvc
@@ -43,11 +43,22 @@ add_action('init', function(): void {
 
 // Register activation hook
 register_activation_hook(__FILE__, function(): void {
-    // Flush rewrite rules on activation
-    flush_rewrite_rules();
+    // Load rewrite system and register rules
+    if (Admin\Admin::isInitialized()) {
+        require_once JMVC_PLUGIN_PATH . 'system/routing/JRewrite.php';
+        \JRewrite::activate();
+    } else {
+        flush_rewrite_rules();
+    }
 });
 
 // Register deactivation hook
 register_deactivation_hook(__FILE__, function(): void {
-    flush_rewrite_rules();
+    // Clean up rewrite rules
+    if (file_exists(JMVC_PLUGIN_PATH . 'system/routing/JRewrite.php')) {
+        require_once JMVC_PLUGIN_PATH . 'system/routing/JRewrite.php';
+        \JRewrite::deactivate();
+    } else {
+        flush_rewrite_rules();
+    }
 });
