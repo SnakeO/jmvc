@@ -2,36 +2,66 @@
 /**
  * JMVC Bootstrap File
  *
- * Include this file in your theme's functions.php or plugin's main file:
- *   require_once get_template_directory() . '/jmvc/system/boot.php';
+ * This file is loaded by the JMVC plugin when the framework is initialized
+ * in the active theme.
  *
  * @package JMVC
  */
+
+declare(strict_types=1);
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
-// Path to this system folder
-define('JSYS', __DIR__ . '/');
-
-// Path to the jmvc root
-define('JMVC', realpath(__DIR__ . '/../') . '/');
-
-// URL to JMVC (define this in your theme if needed)
-if (!defined('JMVC_URL')) {
-    define('JMVC_URL', get_template_directory_uri() . '/jmvc/');
+// Ensure plugin constants are defined
+if (!defined('JMVC_PLUGIN_PATH')) {
+    return;
 }
 
-// Load Composer autoloader
+// Path to the theme's jmvc directory (user's app code)
+$theme_jmvc = get_stylesheet_directory() . '/jmvc/';
+
+// Path to plugin's system folder (framework core)
+define('JSYS', JMVC_PLUGIN_PATH . 'system/');
+
+// Path to theme's jmvc root (controllers, models, views, config)
+define('JMVC', $theme_jmvc);
+
+// URL to theme's jmvc directory
+define('JMVC_URL', get_stylesheet_directory_uri() . '/jmvc/');
+
+// Load Composer autoloader from theme
 $autoloader = JMVC . 'vendor/autoload.php';
 if (file_exists($autoloader)) {
     require_once $autoloader;
-} else {
-    wp_die('JMVC: Please run "composer install" in the jmvc directory.');
 }
 
-// Initialize configuration
+// Load system classes from plugin
+require_once JSYS . 'JBag.php';
+require_once JSYS . 'config/JConfig.php';
+require_once JSYS . 'app/dev/JLog.php';
+require_once JSYS . 'app/dev/DevAlert.php';
+require_once JSYS . 'controller/JController.php';
+require_once JSYS . 'controller/JControllerAjax.php';
+require_once JSYS . 'view/JView.php';
+require_once JSYS . 'model/JModel.php';
+require_once JSYS . 'model/JModelBase.php';
+require_once JSYS . 'model/traits/ACFModelTrait.php';
+
+// Load APIController from plugin's controllers
+$apiController = JMVC_PLUGIN_PATH . 'controllers/pub/APIController.php';
+if (file_exists($apiController)) {
+    require_once $apiController;
+}
+
+// Load JmvcController for health checks (from plugin)
+$jmvcController = JMVC_PLUGIN_PATH . 'controllers/pub/JmvcController.php';
+if (file_exists($jmvcController)) {
+    require_once $jmvcController;
+}
+
+// Initialize configuration from theme
 JConfig::init();
 
 // Initialize KV store
@@ -40,18 +70,24 @@ $store_config = JConfig::get('kvstore');
 if (!empty($store_config['type'])) {
     if ($store_config['type'] === 'redis') {
         try {
-            Predis\Autoloader::register();
-            $redis = new Predis\Client();
-            JBag::set('kvstore', $redis);
+            if (class_exists('Predis\Autoloader')) {
+                Predis\Autoloader::register();
+            }
+            if (class_exists('Predis\Client')) {
+                $redis = new Predis\Client();
+                JBag::set('kvstore', $redis);
+            }
         } catch (Exception $e) {
             error_log('JMVC: Redis connection failed: ' . $e->getMessage());
         }
     } elseif ($store_config['type'] === 'sqlite') {
         try {
-            $db_path = JMVC . 'jmvc.sqlite';
-            $nsql = new NoSQLite\NoSQLite($db_path);
-            $store = $nsql->getStore('jmvc');
-            JBag::set('kvstore', $store);
+            if (class_exists('NoSQLite\NoSQLite')) {
+                $db_path = JMVC . 'jmvc.sqlite';
+                $nsql = new NoSQLite\NoSQLite($db_path);
+                $store = $nsql->getStore('jmvc');
+                JBag::set('kvstore', $store);
+            }
         } catch (Exception $e) {
             error_log('JMVC: SQLite initialization failed: ' . $e->getMessage());
         }
@@ -69,7 +105,7 @@ add_action('rest_api_init', 'jmvc_register_rest_routes');
 /**
  * Register JMVC REST API routes
  */
-function jmvc_register_rest_routes()
+function jmvc_register_rest_routes(): void
 {
     // Main controller route
     register_rest_route('jmvc/v1', '/(?P<env>pub|admin|resource)/(?P<controller>[a-zA-Z0-9_-]+)/(?P<action>[a-zA-Z0-9_-]+)(?:/(?P<params>.*))?', array(
@@ -79,7 +115,7 @@ function jmvc_register_rest_routes()
         'args'                => array(
             'env' => array(
                 'required'          => true,
-                'validate_callback' => function ($param) {
+                'validate_callback' => function ($param): bool {
                     return in_array($param, array('pub', 'admin', 'resource'), true);
                 },
             ),
@@ -101,7 +137,7 @@ function jmvc_register_rest_routes()
     // Nonce endpoint
     register_rest_route('jmvc/v1', '/nonce', array(
         'methods'             => 'GET',
-        'callback'            => function () {
+        'callback'            => function (): WP_REST_Response {
             return rest_ensure_response(array(
                 'nonce' => wp_create_nonce('wp_rest'),
             ));
@@ -116,7 +152,7 @@ function jmvc_register_rest_routes()
  * @param WP_REST_Request $request The request object
  * @return bool|WP_Error True if permitted, WP_Error otherwise
  */
-function jmvc_rest_permission_callback($request)
+function jmvc_rest_permission_callback(WP_REST_Request $request)
 {
     $env = $request->get_param('env');
 
@@ -152,7 +188,7 @@ function jmvc_rest_permission_callback($request)
  * @param WP_REST_Request $request The request object
  * @return WP_REST_Response|WP_Error The response
  */
-function jmvc_rest_controller_callback($request)
+function jmvc_rest_controller_callback(WP_REST_Request $request)
 {
     $env = $request->get_param('env');
     $controller = $request->get_param('controller');
@@ -164,7 +200,7 @@ function jmvc_rest_controller_callback($request)
     if (!empty($params_string)) {
         $params = array_filter(
             explode('/', $params_string),
-            function ($p) {
+            function ($p): bool {
                 return $p !== '';
             }
         );
@@ -218,17 +254,14 @@ function jmvc_rest_controller_callback($request)
 }
 
 /**
- * Enqueue JMVC scripts and provide JavaScript helpers
- *
- * Uncomment and customize in your theme's functions.php
+ * Enqueue JMVC JavaScript helpers
  */
-/*
-add_action('wp_enqueue_scripts', function () {
-    // Provide AJAX and REST API URLs to JavaScript
-    wp_localize_script('jquery', 'JMVC', array(
-        'ajax_url' => admin_url('admin-ajax.php'),
-        'rest_url' => rest_url('jmvc/v1/'),
-        'nonce'    => wp_create_nonce('wp_rest'),
-    ));
+add_action('wp_enqueue_scripts', function (): void {
+    wp_enqueue_script(
+        'jmvc-helpers',
+        JMVC_PLUGIN_URL . 'assets/js/global.js.php',
+        array(),
+        JMVC_VERSION,
+        true
+    );
 });
-*/

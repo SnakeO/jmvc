@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * JMVC Controller Loader
  *
@@ -13,10 +16,8 @@ class JController
 {
     /**
      * Current HMVC module
-     *
-     * @var string|null
      */
-    protected $module;
+    protected ?string $module = null;
 
     /**
      * Constructor
@@ -34,7 +35,7 @@ class JController
      * @param string|null $module The HMVC module name
      * @return object|false The controller instance or false if not found
      */
-    public static function load($controllername, $env = 'admin', $module = null)
+    public static function load(string $controllername, string $env = 'admin', ?string $module = null): object|false
     {
         $valid_envs = array('admin', 'pub', 'resource');
 
@@ -44,7 +45,8 @@ class JController
 
         // Sanitize controller name to prevent directory traversal
         $controllername = sanitize_file_name($controllername);
-        $controller_filename = $controllername . '.php';
+        $controller_filename = $controllername . 'Controller.php';
+        $classname = $controllername . 'Controller';
 
         // Load from main or module
         if (!$module) {
@@ -63,7 +65,7 @@ class JController
             }
 
             require_once $path;
-            $class = $controllername;
+            $class = $classname;
         } else {
             // Sanitize module name
             $module = sanitize_file_name($module);
@@ -83,7 +85,7 @@ class JController
 
             // Modules are namespaced
             require_once $path;
-            $class = $module . '\\' . $env . '\\' . $controllername;
+            $class = $module . '\\' . $env . '\\' . $classname;
         }
 
         if (!class_exists($class)) {

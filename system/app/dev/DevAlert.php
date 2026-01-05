@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * JMVC Developer Alert System
  *
@@ -20,7 +23,7 @@ class DevAlert
      *
      * @var array
      */
-    public static $promises = array();
+    public static array $promises = [];
 
     /**
      * Send an alert out to the site admins via email
@@ -28,7 +31,7 @@ class DevAlert
      * @param string $topic Alert subject
      * @param mixed $deets Details of error message
      */
-    public static function mail($topic, $deets = '')
+    public static function mail(string $topic, mixed $deets = ''): void
     {
         $body = self::constructBody($topic, $deets);
         $email = JConfig::get('devalert/mail/email');
@@ -41,7 +44,7 @@ class DevAlert
     /**
      * Wait for all async DevAlert promises to complete
      */
-    public static function waitForPromises()
+    public static function waitForPromises(): void
     {
         foreach (self::$promises as $promise) {
             try {
@@ -59,7 +62,7 @@ class DevAlert
      * @param string $topic Alert subject
      * @param mixed $deets Details of error message
      */
-    public static function slack($topic, $deets = '')
+    public static function slack(string $topic, mixed $deets = ''): void
     {
         try {
             $slack_config = JConfig::get('devalert/slack');
@@ -100,7 +103,7 @@ class DevAlert
      * @param string $topic Alert subject
      * @param mixed $deets Details of error message
      */
-    public static function send($topic, $deets = '')
+    public static function send(string $topic, mixed $deets = ''): void
     {
         self::slack($topic, $deets);
     }
@@ -108,7 +111,7 @@ class DevAlert
     /**
      * Initialize the DevAlert system
      */
-    public static function init()
+    public static function init(): void
     {
         register_shutdown_function(array(__CLASS__, 'waitForPromises'));
 
@@ -118,7 +121,7 @@ class DevAlert
     /**
      * Handle AJAX requests for devalert viewing
      */
-    public static function ajax_handler()
+    public static function ajax_handler(): never
     {
         // Only admins can view dev alerts
         if (!current_user_can('manage_options')) {
@@ -153,7 +156,7 @@ class DevAlert
      * @param mixed $deets Details of error message
      * @return string Formatted message body
      */
-    private static function constructBody($topic, $deets = '')
+    private static function constructBody(string $topic, mixed $deets = ''): string
     {
         $uid = uniqid('devalert_', true);
 
@@ -179,7 +182,7 @@ class DevAlert
             }
             $deets_output = $formatted;
         } else {
-            $deets_output = esc_html($deets_output);
+            $deets_output = esc_html((string) $deets_output);
         }
 
         $msg = '<pre>';
@@ -216,10 +219,10 @@ class DevAlert
         $msg .= esc_html(print_r(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS), true));
 
         $msg .= "\n\n==========CURRENT BLOG ID==========\n";
-        $msg .= esc_html(get_current_blog_id()) . "\n\n";
+        $msg .= esc_html((string) get_current_blog_id()) . "\n\n";
 
         $msg .= "\n\n==========CURRENT USER ID==========\n";
-        $msg .= esc_html(get_current_user_id()) . "\n\n";
+        $msg .= esc_html((string) get_current_user_id()) . "\n\n";
 
         $msg .= '</pre>';
 

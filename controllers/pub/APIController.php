@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * Base API Controller for JSON endpoints
  *
@@ -11,7 +14,7 @@ if (!defined('ABSPATH')) {
 
 class APIController
 {
-    protected $api_result_mode = 'json';
+    protected string $api_result_mode = 'json';
 
     /**
      * Extract only specified fields from an associative array
@@ -20,7 +23,7 @@ class APIController
      * @param array $fields Fields to extract (empty returns all)
      * @return array Filtered array
      */
-    protected function extractFields($assoc_array, $fields)
+    protected function extractFields(array $assoc_array, array $fields): array
     {
         if (!$fields) {
             return $assoc_array;
@@ -41,7 +44,7 @@ class APIController
      * @param array $params Raw parameters
      * @return array Cleaned parameters
      */
-    protected function cleanParams($params)
+    protected function cleanParams(array $params): array
     {
         // string -> boolean conversion
         foreach ($params as $k => $v) {
@@ -62,7 +65,7 @@ class APIController
      *
      * @param string $mode 'json' or 'return'
      */
-    public function api_set_mode($mode)
+    public function api_set_mode(string $mode): void
     {
         $this->api_result_mode = sanitize_key($mode);
     }
@@ -74,9 +77,9 @@ class APIController
      * @param array $result Result data
      * @return mixed JSON output or object depending on mode
      */
-    public function api_result($success, $result = array())
+    public function api_result(bool $success, array $result = []): mixed
     {
-        $result['success'] = (bool) $success;
+        $result['success'] = $success;
 
         if ($this->api_result_mode === 'json') {
             $json = wp_json_encode($result);
@@ -99,7 +102,7 @@ class APIController
             }
 
             echo $json;
-            return;
+            return null;
         }
 
         if ($this->api_result_mode === 'return') {
@@ -114,7 +117,7 @@ class APIController
      *
      * @param array $fields Array to stringify
      */
-    public function api_stringify(&$fields)
+    public function api_stringify(array &$fields): void
     {
         foreach ($fields as $k => $v) {
             if (is_string($v)) {
@@ -141,7 +144,7 @@ class APIController
      * @param array $result Result data
      * @return mixed
      */
-    public function api_success($result = array())
+    public function api_success(array $result = []): mixed
     {
         return $this->api_result(true, $result);
     }
@@ -152,7 +155,7 @@ class APIController
      * @param string $msg Error message
      * @param array $result Additional result data
      */
-    public function api_die($msg, $result = array())
+    public function api_die(string $msg, array $result = []): never
     {
         $result['message'] = $msg;
 

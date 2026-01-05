@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * JMVC Service Locator / Global Store
  *
@@ -13,17 +16,15 @@ class JBag
 {
     /**
      * Current HMVC module
-     *
-     * @var string|null
      */
-    public static $module;
+    public static ?string $module = null;
 
     /**
      * Storage array for services
      *
-     * @var array
+     * @var array<string, mixed>
      */
-    private static $things = array();
+    private static array $things = [];
 
     /**
      * Store a value
@@ -31,7 +32,7 @@ class JBag
      * @param string $k Key
      * @param mixed $v Value
      */
-    public static function set($k, $v)
+    public static function set(string $k, mixed $v): void
     {
         self::$things[$k] = $v;
     }
@@ -40,9 +41,9 @@ class JBag
      * Retrieve a value
      *
      * @param string $k Key
-     * @return mixed|null The value or null if not found
+     * @return mixed The value or null if not found
      */
-    public static function get($k)
+    public static function get(string $k): mixed
     {
         return self::$things[$k] ?? null;
     }
@@ -53,7 +54,7 @@ class JBag
      * @param string $k Key
      * @return bool True if key exists
      */
-    public static function has($k)
+    public static function has(string $k): bool
     {
         return array_key_exists($k, self::$things);
     }
@@ -63,7 +64,7 @@ class JBag
      *
      * @param string $k Key
      */
-    public static function remove($k)
+    public static function remove(string $k): void
     {
         unset(self::$things[$k]);
     }

@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * JMVC ACF Model Trait
  *
@@ -19,9 +22,9 @@ trait ACFModelTrait
     /**
      * Cached field key map
      *
-     * @var array|null
+     * @var array<string, string>|null
      */
-    public $acf_field_key_map;
+    public ?array $acf_field_key_map = null;
 
     /**
      * Get the ACF field key map for this model
@@ -29,9 +32,9 @@ trait ACFModelTrait
      * Returns an array whose keys are the human-readable ACF field names,
      * and the values are the field keys.
      *
-     * @return array Field name to key mapping
+     * @return array<string, string> Field name to key mapping
      */
-    public function getFieldKeyMap()
+    public function getFieldKeyMap(): array
     {
         $post_id = $this->id;
 
@@ -45,12 +48,12 @@ trait ACFModelTrait
             'post_type' => static::$post_type,
         );
 
-        if (strpos($post_id, 'user_') !== false) {
+        if (is_string($post_id) && strpos($post_id, 'user_') !== false) {
             $user_id = str_replace('user_', '', $post_id);
             $filter = array(
                 'ef_user' => absint($user_id),
             );
-        } elseif (strpos($post_id, 'taxonomy_') !== false) {
+        } elseif (is_string($post_id) && strpos($post_id, 'taxonomy_') !== false) {
             $taxonomy_id = str_replace('taxonomy_', '', $post_id);
             $filter = array(
                 'ef_taxonomy' => absint($taxonomy_id),
@@ -78,7 +81,7 @@ trait ACFModelTrait
      *
      * @return int|false The new post ID or false on failure
      */
-    public function add()
+    public function add(): int|false
     {
         // Capability check
         if (!current_user_can('edit_posts')) {
@@ -97,7 +100,6 @@ trait ACFModelTrait
 
         $post_id = wp_insert_post($post_data, true);
 
-        // Fixed: was checking $post instead of $post_id
         if (is_wp_error($post_id)) {
             DevAlert::slack('ACFModelTrait::add() error inserting post', array(
                 'post_data' => $post_data,
@@ -117,7 +119,7 @@ trait ACFModelTrait
      *
      * @return bool True on success
      */
-    public function update()
+    public function update(): bool
     {
         // Capability check
         if (!current_user_can('edit_post', $this->id)) {
@@ -152,7 +154,7 @@ trait ACFModelTrait
      * @param string $field Field name
      * @return bool True if ACF field exists
      */
-    public function hasAcfField($field)
+    public function hasAcfField(string $field): bool
     {
         return array_key_exists($field, $this->getFieldKeyMap());
     }
@@ -163,7 +165,7 @@ trait ACFModelTrait
      * @param string $key Field name
      * @return mixed Field value
      */
-    public function __get($key)
+    public function __get(string $key): mixed
     {
         // Check if already set in data array
         if (isset($this->data[$key])) {

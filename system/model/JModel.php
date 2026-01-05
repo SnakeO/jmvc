@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * JMVC Model Loader
  *
@@ -14,9 +17,9 @@ class JModel
     /**
      * Singleton instances
      *
-     * @var array
+     * @var array<string, object>
      */
-    public static $singletons = array();
+    public static array $singletons = [];
 
     /**
      * Load a model class
@@ -27,7 +30,7 @@ class JModel
      * @return object|null Model instance
      * @throws Exception If model not found
      */
-    public static function load($modelpath, $module = null, $get_singleton = false)
+    public static function load(string $modelpath, ?string $module = null, bool $get_singleton = false): ?object
     {
         // Sanitize path
         $modelpath = sanitize_file_name($modelpath);
@@ -96,9 +99,9 @@ class JModel
      *
      * @param string $modelpath Model path
      * @param string|null $module HMVC module name
-     * @return string|false Path to model or false if not found
+     * @return string|bool Path to model or false if not found
      */
-    public static function exists($modelpath, $module = null)
+    public static function exists(string $modelpath, ?string $module = null): string|bool
     {
         $modelpath = sanitize_file_name($modelpath);
         $module = $module ? sanitize_file_name($module) : null;

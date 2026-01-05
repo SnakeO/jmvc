@@ -1,31 +1,70 @@
-<?php  
+<?php
 
-class JConfig {
+declare(strict_types=1);
 
-	public static $config = array();
+/**
+ * JMVC Configuration Manager
+ *
+ * @package JMVC
+ */
 
-	public function init()
-	{
-		// load in config
-		foreach( glob(JMVC . 'config/*.php') as $config_file ) {
-			require_once $config_file;
-		}
-	}
+if (!defined('ABSPATH')) {
+    exit;
+}
 
-	public function set($what, $val)
-	{
-		self::$config[$what] = $val;
-	}
+class JConfig
+{
+    /**
+     * Configuration storage
+     *
+     * @var array<string, mixed>
+     */
+    public static array $config = [];
 
-	// JConfig::get('array/path/to/item');
-	public function get($what_path)
-	{
-		$what_parts = explode('/', $what_path);
-		$val = @self::$config[array_shift($what_parts)];
-		foreach($what_parts as $what_part) {
-			$val = @$val[$what_part];
-		}
+    /**
+     * Initialize configuration by loading all config files
+     */
+    public static function init(): void
+    {
+        // Load in config
+        $config_files = glob(JMVC . 'config/*.php');
+        if ($config_files) {
+            foreach ($config_files as $config_file) {
+                require_once $config_file;
+            }
+        }
+    }
 
-		return @$val;
-	}
+    /**
+     * Set a configuration value
+     *
+     * @param string $what Configuration key
+     * @param mixed $val Configuration value
+     */
+    public static function set(string $what, mixed $val): void
+    {
+        self::$config[$what] = $val;
+    }
+
+    /**
+     * Get a configuration value using path notation
+     *
+     * @param string $what_path Path to configuration (e.g., 'array/path/to/item')
+     * @return mixed The configuration value or null if not found
+     */
+    public static function get(string $what_path): mixed
+    {
+        $what_parts = explode('/', $what_path);
+        $first_key = array_shift($what_parts);
+        $val = self::$config[$first_key] ?? null;
+
+        foreach ($what_parts as $what_part) {
+            if (!is_array($val)) {
+                return null;
+            }
+            $val = $val[$what_part] ?? null;
+        }
+
+        return $val;
+    }
 }

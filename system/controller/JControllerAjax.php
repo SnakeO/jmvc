@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * JMVC AJAX Controller System
  *
@@ -22,9 +25,9 @@ class JControllerAjax
     /**
      * Initialize the AJAX controller system
      *
-     * @return JControllerAjax
+     * @return self
      */
-    public static function init()
+    public static function init(): self
     {
         return new self();
     }
@@ -56,7 +59,7 @@ class JControllerAjax
     /**
      * Get a nonce for AJAX requests
      */
-    public function get_nonce()
+    public function get_nonce(): void
     {
         wp_send_json(array(
             'nonce' => wp_create_nonce('jmvc_ajax_nonce'),
@@ -69,7 +72,7 @@ class JControllerAjax
      * @param bool $required Whether nonce is required (admin always requires)
      * @return bool True if valid
      */
-    protected function verify_nonce($required = true)
+    protected function verify_nonce(bool $required = true): bool
     {
         $nonce = isset($_REQUEST['_jmvc_nonce']) ? sanitize_text_field($_REQUEST['_jmvc_nonce']) : '';
 
@@ -78,13 +81,13 @@ class JControllerAjax
             exit;
         }
 
-        return wp_verify_nonce($nonce, 'jmvc_ajax_nonce');
+        return (bool) wp_verify_nonce($nonce, 'jmvc_ajax_nonce');
     }
 
     /**
      * Admin controller handler
      */
-    public function admin_controller()
+    public function admin_controller(): void
     {
         // Admin controllers always require nonce and login
         if (!is_user_logged_in()) {
@@ -99,7 +102,7 @@ class JControllerAjax
     /**
      * Public controller handler
      */
-    public function pub_controller()
+    public function pub_controller(): void
     {
         // Public controllers optionally verify nonce
         $this->verify_nonce(false);
@@ -109,7 +112,7 @@ class JControllerAjax
     /**
      * Resource controller handler
      */
-    public function resource_controller()
+    public function resource_controller(): void
     {
         // Resource controllers optionally verify nonce
         $this->verify_nonce(false);
@@ -121,7 +124,7 @@ class JControllerAjax
      *
      * @param string $env The environment (pub, admin, resource)
      */
-    public function ajax_controller($env)
+    public function ajax_controller(string $env): never
     {
         // Sanitize inputs
         $module = isset($_GET['module']) ? sanitize_file_name($_GET['module']) : null;
@@ -142,7 +145,7 @@ class JControllerAjax
         $funk = sanitize_key($funk);
 
         // Filter out empty params
-        $params = array_filter($parts, function ($p) {
+        $params = array_filter($parts, function ($p): bool {
             return $p !== null && $p !== '';
         });
         $params = array_values($params);
@@ -198,7 +201,7 @@ class JControllerAjax
      * @param array $query_vars Current query vars
      * @return array Updated query vars
      */
-    public function query_vars($query_vars)
+    public function query_vars(array $query_vars): array
     {
         $query_vars[] = 'action';
         $query_vars[] = 'path';
@@ -215,7 +218,7 @@ class JControllerAjax
  * @param string|null $module The HMVC module name (optional)
  * @return string The generated URL
  */
-function controller_url($url, $env = 'admin', $module = null)
+function controller_url(string $url, string $env = 'admin', ?string $module = null): string
 {
     $valid_envs = array('admin', 'public', 'pub', 'resource');
 
@@ -255,7 +258,7 @@ function controller_url($url, $env = 'admin', $module = null)
  *
  * @return string The nonce value
  */
-function jmvc_get_nonce()
+function jmvc_get_nonce(): string
 {
     return wp_create_nonce('jmvc_ajax_nonce');
 }

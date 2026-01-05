@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * JMVC - Utility Functions
  *
@@ -9,31 +12,42 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// http://wpeden.com/tipsntuts/how-to-get-logged-in-users-role-in-wordpress/
-// if $id is not passed in, it will get the user role of the logged in user
-function get_user_role($id=null)
+/**
+ * Get the role of a user
+ *
+ * @param int|null $id User ID (defaults to current user)
+ * @return string|null The user's role or null if not found
+ */
+function get_user_role(?int $id = null): ?string
 {
-	global $current_user;
-	
-	if(!$id) $id = $current_user->ID;
-	
-	if ( is_user_logged_in() ) 
-	{
-		$user = new WP_User( $id );
-		
-		if ( !empty( $user->roles ) && is_array( $user->roles ) ) 
-		{
-			foreach ( $user->roles as $role ) {
-				return $role;
-			}
-		}
-	}
+    global $current_user;
+
+    if (!$id) {
+        $id = $current_user->ID;
+    }
+
+    if (is_user_logged_in()) {
+        $user = new WP_User($id);
+
+        if (!empty($user->roles) && is_array($user->roles)) {
+            foreach ($user->roles as $role) {
+                return $role;
+            }
+        }
+    }
+
+    return null;
 }
 
-// so that we can be more explicit when we use site_url() within codeigniter
-function wp_site_url($url)
+/**
+ * Wrapper for site_url for use within CodeIgniter context
+ *
+ * @param string $url URL path
+ * @return string Full site URL
+ */
+function wp_site_url(string $url): string
 {
-	return site_url($url);
+    return site_url($url);
 }
 
 /**
@@ -41,26 +55,26 @@ function wp_site_url($url)
  *
  * @return bool True if user is a page admin
  */
-function is_page_admin()
+function is_page_admin(): bool
 {
-	if (!is_user_logged_in()) {
-		return false;
-	}
+    if (!is_user_logged_in()) {
+        return false;
+    }
 
-	if (is_super_admin()) {
-		return true;
-	}
+    if (is_super_admin()) {
+        return true;
+    }
 
-	if (is_user_member_of_blog(get_current_user_id(), App::$d->promo->wp_blog_id)) {
-		return true;
-	}
+    if (is_user_member_of_blog(get_current_user_id(), App::$d->promo->wp_blog_id)) {
+        return true;
+    }
 
-	$ci = &get_instance();
-	if (isset($ci->fb) && $ci->fb->isAdmin()) {
-		return true;
-	}
+    $ci = &get_instance();
+    if (isset($ci->fb) && $ci->fb->isAdmin()) {
+        return true;
+    }
 
-	return false;
+    return false;
 }
 
 /**
@@ -68,78 +82,101 @@ function is_page_admin()
  *
  * @return string|false Domain name or false on failure
  */
-function get_current_domain()
+function get_current_domain(): string|false
 {
-	$blog_url = home_url();
-	preg_match('/https?:\/\/([^\.]+)/', $blog_url, $matches);
+    $blog_url = home_url();
+    preg_match('/https?:\/\/([^\.]+)/', $blog_url, $matches);
 
-	if (empty($matches[1])) {
-		return false;
-	}
+    if (empty($matches[1])) {
+        return false;
+    }
 
-	return $matches[1];
+    return $matches[1];
 }
 
-// make a one-way token so no one can login by just typing in the url w/the facebook page id
-function salty_word($word)
+/**
+ * Create a one-way salted hash of a word
+ *
+ * @param string $word Word to hash
+ * @return string MD5 hash
+ */
+function salty_word(string $word): string
 {
-	return md5("sweet-and-salty-$word");
+    return md5("sweet-and-salty-$word");
 }
 
-// get a post by slug
-function id_from_slug( $slug, $post_type='page' ) 
+/**
+ * Get a post ID from its slug
+ *
+ * @param string $slug Post slug
+ * @param string $post_type Post type
+ * @return int|null Post ID or null if not found
+ */
+function id_from_slug(string $slug, string $post_type = 'page'): ?int
 {
-	$attrs = array('name' => $slug);
+    $attrs = array('name' => $slug);
 
-	if( $post_type ) {
-		$attrs['post_type'] = $post_type;
-	}
+    if ($post_type) {
+        $attrs['post_type'] = $post_type;
+    }
 
-   // $query = new WP_Query($attrs);
+    $posts = get_posts($attrs);
 
-   // $query->the_post();
-   // $id = get_the_ID();
+    if ($posts) {
+        return $posts[0]->ID;
+    }
 
-   // wp_reset_postdata();
-   // wp_reset_query();
-
-	$posts = get_posts($attrs);
-
-	if( $posts ) {
-		return $posts[0]->ID;
-	}
-
-	return null;
+    return null;
 }
 
-// clear QUICK CACHE (wordpress plugin)
-function util_clear_cache()
+/**
+ * Clear Quick Cache (WordPress plugin)
+ *
+ * @return int|false Cache clear result or false if not available
+ */
+function util_clear_cache(): int|false
 {
-	if( !isset($GLOBALS['quick_cache']) ) {
-		return false;
-	}
+    if (!isset($GLOBALS['quick_cache'])) {
+        return false;
+    }
 
-	return $GLOBALS['quick_cache']->auto_clear_cache() + $GLOBALS['quick_cache']->auto_clear_home_page_cache();
+    return $GLOBALS['quick_cache']->auto_clear_cache() + $GLOBALS['quick_cache']->auto_clear_home_page_cache();
 }
 
-// time NOW @ UTC 0
-function utc_time($when='now')
+/**
+ * Get current UTC timestamp
+ *
+ * @param string $when DateTime string
+ * @return int Unix timestamp
+ */
+function utc_time(string $when = 'now'): int
 {
-	return utc_date($when)->getTimestamp();
+    return utc_date($when)->getTimestamp();
 }
 
-function utc_date($when='now')
+/**
+ * Get current UTC DateTime object
+ *
+ * @param string $when DateTime string
+ * @return DateTime DateTime object in UTC
+ */
+function utc_date(string $when = 'now'): DateTime
 {
-	$utc_tz = new DateTimeZone('Europe/London');
-	$now_dt = new DateTime($when, $utc_tz); // GMT +0
+    $utc_tz = new DateTimeZone('Europe/London');
+    $now_dt = new DateTime($when, $utc_tz);
 
-	return $now_dt;
+    return $now_dt;
 }
 
-// shorten the url
-function short_url($url)
+/**
+ * Shorten a URL using sht.tl service
+ *
+ * @param string $url URL to shorten
+ * @return string|false Shortened URL or false on failure
+ */
+function short_url(string $url): string|false
 {
-	return file_get_contents("http://sht.tl/api.php?action=shorten&response=plain&longUrl=" . urlencode($url));
+    return file_get_contents("http://sht.tl/api.php?action=shorten&response=plain&longUrl=" . urlencode($url));
 }
 
 /**
@@ -148,67 +185,54 @@ function short_url($url)
  * @param WP_User $user The user object to authenticate
  * @throws Exception If user is not valid
  */
-function auth_user($user)
+function auth_user(WP_User $user): void
 {
-	if (empty($user->ID)) {
-		throw new Exception("auth_user: user is not valid");
-	}
+    if (empty($user->ID)) {
+        throw new Exception("auth_user: user is not valid");
+    }
 
-	// Clear existing WordPress cookies
-	jmvc_clear_wp_cookies();
+    // Clear existing WordPress cookies
+    jmvc_clear_wp_cookies();
 
-	wp_set_current_user($user->ID);
+    wp_set_current_user($user->ID);
 
-	// Set auth cookies for both HTTP and HTTPS
-	wp_set_auth_cookie($user->ID, true, false);
-	wp_set_auth_cookie($user->ID, true, true);
+    // Set auth cookies for both HTTP and HTTPS
+    wp_set_auth_cookie($user->ID, true, false);
+    wp_set_auth_cookie($user->ID, true, true);
 
-	do_action('wp_login', $user->user_login, $user);
+    do_action('wp_login', $user->user_login, $user);
 }
 
 /**
  * Clear WordPress authentication cookies
- *
- * @return void
  */
-function jmvc_clear_wp_cookies()
+function jmvc_clear_wp_cookies(): void
 {
-	if (!isset($_SERVER['HTTP_COOKIE'])) {
-		return;
-	}
+    if (!isset($_SERVER['HTTP_COOKIE'])) {
+        return;
+    }
 
-	$cookies = explode(';', $_SERVER['HTTP_COOKIE']);
-	$my_domain = isset($_SERVER['SERVER_NAME']) ? '.' . sanitize_text_field($_SERVER['SERVER_NAME']) : '';
-	$site_domain = wp_parse_url(home_url(), PHP_URL_HOST);
-	$cookie_domain = $site_domain ? '.' . $site_domain : '';
+    $cookies = explode(';', $_SERVER['HTTP_COOKIE']);
+    $my_domain = isset($_SERVER['SERVER_NAME']) ? '.' . sanitize_text_field($_SERVER['SERVER_NAME']) : '';
+    $site_domain = wp_parse_url(home_url(), PHP_URL_HOST);
+    $cookie_domain = $site_domain ? '.' . $site_domain : '';
 
-	$paths = array('/', '/wp-admin', '/wp-login');
+    $paths = array('/', '/wp-admin', '/wp-login');
 
-	foreach ($cookies as $cookie) {
-		$parts = explode('=', $cookie, 2);
-		$name = trim($parts[0]);
+    foreach ($cookies as $cookie) {
+        $parts = explode('=', $cookie, 2);
+        $name = trim($parts[0]);
 
-		if (stripos($name, 'wp-') !== false || stripos($name, 'wordpress') !== false) {
-			foreach ($paths as $path) {
-				setcookie($name, '', 1, $path);
-				if ($cookie_domain) {
-					setcookie($name, '', 1, $path, $cookie_domain);
-				}
-				if ($my_domain && $my_domain !== $cookie_domain) {
-					setcookie($name, '', 1, $path, $my_domain);
-				}
-			}
-		}
-	}
+        if (stripos($name, 'wp-') !== false || stripos($name, 'wordpress') !== false) {
+            foreach ($paths as $path) {
+                setcookie($name, '', 1, $path);
+                if ($cookie_domain) {
+                    setcookie($name, '', 1, $path, $cookie_domain);
+                }
+                if ($my_domain && $my_domain !== $cookie_domain) {
+                    setcookie($name, '', 1, $path, $my_domain);
+                }
+            }
+        }
+    }
 }
-
-/*
-// in order for auth_user above to work, we force wordpress to not
-// care about the 'secure' flag when looking @ cookies
-add_filter('auth_redirect_scheme', function($secure)
-{
-	return 'auth';
-});
-*/
-
-?>

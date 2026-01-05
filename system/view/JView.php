@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * JMVC View System
  *
@@ -11,7 +14,10 @@ if (!defined('ABSPATH')) {
 
 class JView
 {
-    public static $module;
+    /**
+     * Current HMVC module
+     */
+    public static ?string $module = null;
 
     /**
      * Display a view
@@ -20,7 +26,7 @@ class JView
      * @param array $data Data to pass to view
      * @param string|false $force_module Force specific module
      */
-    public static function show($view, $data = array(), $force_module = false)
+    public static function show(string $view, array $data = [], string|false $force_module = false): void
     {
         echo self::get($view, $data, $force_module);
     }
@@ -34,7 +40,7 @@ class JView
      * @return string Rendered view content
      * @throws Exception If view not found or data is invalid
      */
-    public static function get($view, $data = array(), $force_module = false)
+    public static function get(string $view, array $data = [], string|false $force_module = false): string
     {
         if (!is_array($data)) {
             throw new Exception(sprintf('Data for view %s is not an array.', esc_html($view)));
@@ -44,7 +50,7 @@ class JView
         $view = sanitize_file_name(str_replace('/', DIRECTORY_SEPARATOR, $view));
         $view = str_replace(DIRECTORY_SEPARATOR, '/', $view);
 
-        $module = $force_module ? $force_module : self::$module;
+        $module = $force_module !== false ? $force_module : self::$module;
         $view_pathinfo = pathinfo($view);
 
         // Check HMVC module first
@@ -69,7 +75,7 @@ class JView
         // Verify the view file is within allowed directories
         $real_fullview = realpath($fullview);
         $real_viewdir = realpath(dirname(__FILE__) . '/../../');
-        if (strpos($real_fullview, $real_viewdir) !== 0) {
+        if ($real_fullview === false || strpos($real_fullview, $real_viewdir) !== 0) {
             throw new Exception('Invalid view path.');
         }
 
@@ -83,7 +89,7 @@ class JView
         ob_start();
 
         // Create a closure to isolate variable scope and prevent pollution
-        $__jmvc_render = function ($__file, $__data, $view_url) {
+        $__jmvc_render = function (string $__file, array $__data, string $view_url): void {
             // Make data available as individual variables
             foreach ($__data as $__key => $__value) {
                 // Skip reserved variable names
@@ -99,6 +105,6 @@ class JView
 
         $__jmvc_render($__jmvc_fullview, $__jmvc_view_data, $__jmvc_view_url);
 
-        return ob_get_clean();
+        return ob_get_clean() ?: '';
     }
 }

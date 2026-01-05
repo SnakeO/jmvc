@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * JMVC Base Model Class
  *
@@ -13,24 +16,20 @@ class JModelBase
 {
     /**
      * Post ID
-     *
-     * @var int|null
      */
-    public $id;
+    public ?int $id = null;
 
     /**
      * Post type - override in subclasses
-     *
-     * @var string
      */
-    public static $post_type;
+    public static ?string $post_type = null;
 
     /**
      * Model data used for saving/creating
      *
-     * @var array
+     * @var array<string, mixed>
      */
-    protected $data = array();
+    protected array $data = [];
 
     /**
      * Constructor
@@ -38,14 +37,14 @@ class JModelBase
      * @param int|null $id The post ID
      * @throws Exception If no post_type is specified
      */
-    public function __construct($id = null)
+    public function __construct(?int $id = null)
     {
         if (empty(static::$post_type)) {
             throw new Exception('No post_type specified for JModel: ' . get_called_class());
         }
 
         if ($id) {
-            $this->id = absint($id);
+            $this->id = $id;
         }
     }
 
@@ -57,12 +56,12 @@ class JModelBase
      * @param array $filters Query filters
      * @return array Array of model instances
      */
-    public static function find($filters = array())
+    public static function find(array $filters = []): array
     {
-        $filters = array_merge(array(
+        $filters = array_merge([
             'post_type'      => static::$post_type,
             'posts_per_page' => -1,
-        ), $filters);
+        ], $filters);
 
         $classname = get_called_class();
 
@@ -77,7 +76,7 @@ class JModelBase
      * @param string $as Output type (OBJECT, ARRAY_A, or ARRAY_N)
      * @return WP_Post|array|null The post object or array
      */
-    public function post($as = OBJECT)
+    public function post(string $as = OBJECT): WP_Post|array|null
     {
         return get_post($this->id, $as);
     }
@@ -88,7 +87,7 @@ class JModelBase
      * @return string The post title
      * @throws Exception Must be overridden
      */
-    public function makePostTitle()
+    public function makePostTitle(): string
     {
         throw new Exception('JModelBase: override makePostTitle()');
     }
@@ -99,7 +98,7 @@ class JModelBase
      * @param string $key The attribute key
      * @return mixed The attribute value or null
      */
-    public function getPostAttr($key)
+    public function getPostAttr(string $key): mixed
     {
         $post = $this->post();
 
@@ -115,11 +114,11 @@ class JModelBase
      *
      * @return int|false The post ID or false on failure
      */
-    public function save()
+    public function save(): int|false
     {
         if (!$this->id) {
             $this->add();
-            return $this->id;
+            return $this->id ?: false;
         }
 
         $this->update();
@@ -131,7 +130,7 @@ class JModelBase
      *
      * @return int|false The new post ID or false
      */
-    public function add()
+    public function add(): int|false
     {
         // Implementation in ACFModelTrait
         return false;
@@ -142,7 +141,7 @@ class JModelBase
      *
      * @return bool Success status
      */
-    public function update()
+    public function update(): bool
     {
         // Implementation in ACFModelTrait
         return false;
@@ -154,7 +153,7 @@ class JModelBase
      * @param string $k Key
      * @param mixed $v Value
      */
-    public function __set($k, $v)
+    public function __set(string $k, mixed $v): void
     {
         $this->data[$k] = $v;
     }
@@ -165,7 +164,7 @@ class JModelBase
      * @param string $field Field name
      * @return mixed The field value or null
      */
-    public function __get($field)
+    public function __get(string $field): mixed
     {
         // Check data array first
         if (array_key_exists($field, $this->data)) {
@@ -188,7 +187,7 @@ class JModelBase
      * @param string $field Field name
      * @return bool True if field exists
      */
-    public function __isset($field)
+    public function __isset(string $field): bool
     {
         return array_key_exists($field, $this->data) || $this->getPostAttr($field) !== null;
     }

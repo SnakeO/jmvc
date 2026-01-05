@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * JMVC Logging System
  *
@@ -13,22 +16,20 @@ class JLog
 {
     /**
      * Whether to send logs to Slack
-     *
-     * @var bool
      */
-    public static $should_slack = true;
+    public static bool $should_slack = true;
 
     /**
      * Flash log messages for this request
      *
-     * @var array
+     * @var array<int, string>
      */
-    public static $flash_log = array();
+    public static array $flash_log = [];
 
     /**
      * Initialize the logging system
      */
-    public static function init()
+    public static function init(): void
     {
         register_shutdown_function(array(__CLASS__, 'slackOutLog'));
     }
@@ -36,7 +37,7 @@ class JLog
     /**
      * Send accumulated logs to Slack on shutdown
      */
-    public static function slackOutLog()
+    public static function slackOutLog(): void
     {
         if (static::$should_slack && count(static::$flash_log) > 0) {
             DevAlert::slack('JLog', implode("\n", static::$flash_log));
@@ -50,7 +51,7 @@ class JLog
      * @param string $msg Log message
      * @param mixed $deets Additional details
      */
-    public static function log($which, $msg, $deets = '')
+    public static function log(string $which, string $msg, mixed $deets = ''): void
     {
         $kvstore = JBag::get('kvstore');
 
@@ -82,7 +83,7 @@ class JLog
      * @param string $msg Message
      * @param mixed $deets Details
      */
-    public static function info($msg, $deets = '')
+    public static function info(string $msg, mixed $deets = ''): void
     {
         self::log('info', $msg, $deets);
     }
@@ -93,7 +94,7 @@ class JLog
      * @param string $msg Message
      * @param mixed $deets Details
      */
-    public static function warn($msg, $deets = '')
+    public static function warn(string $msg, mixed $deets = ''): void
     {
         self::log('warn', $msg, $deets);
     }
@@ -104,7 +105,7 @@ class JLog
      * @param string $msg Message
      * @param mixed $deets Details
      */
-    public static function error($msg, $deets = '')
+    public static function error(string $msg, mixed $deets = ''): void
     {
         self::log('error', $msg, $deets);
     }

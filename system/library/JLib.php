@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * JMVC Library Loader
  *
@@ -14,23 +17,21 @@ class JLib
     /**
      * Loaded library instances
      *
-     * @var array
+     * @var array<string, object>
      */
-    public static $libs = array();
+    public static array $libs = [];
 
     /**
      * Current module
-     *
-     * @var string|null
      */
-    public $module;
+    public ?string $module = null;
 
     /**
      * Constructor
      *
      * @param string|null $module HMVC module name
      */
-    public function __construct($module = null)
+    public function __construct(?string $module = null)
     {
         $this->module = $module;
     }
@@ -43,7 +44,7 @@ class JLib
      * @return object|false Library instance or false if not found
      * @throws Exception If class doesn't exist
      */
-    public static function load($librarypath, $module = null)
+    public static function load(string $librarypath, ?string $module = null): object|false
     {
         // Already loaded?
         if (isset(self::$libs[$librarypath])) {
@@ -51,11 +52,14 @@ class JLib
         }
 
         // Sanitize inputs
-        $librarypath = preg_replace('/[^a-zA-Z0-9_\/\-]/', '', $librarypath);
+        $librarypath_clean = preg_replace('/[^a-zA-Z0-9_\/\-]/', '', $librarypath);
+        if ($librarypath_clean === null) {
+            return false;
+        }
         $module = $module ? sanitize_file_name($module) : null;
 
         // Allow for libraries to live in nested subdirectories
-        $pathinfo = pathinfo($librarypath);
+        $pathinfo = pathinfo($librarypath_clean);
         $libraryname = $pathinfo['basename'];
         $librarydir = $pathinfo['dirname'];
 
@@ -84,7 +88,7 @@ class JLib
             $real_path = realpath($path);
             $real_base = realpath($base_path);
 
-            if ($real_path === false || strpos($real_path, $real_base) !== 0) {
+            if ($real_path === false || $real_base === false || strpos($real_path, $real_base) !== 0) {
                 return false;
             }
 
@@ -108,7 +112,7 @@ class JLib
             $real_path = realpath($path);
             $real_base = realpath(JMVC . 'modules/');
 
-            if ($real_path === false || strpos($real_path, $real_base) !== 0) {
+            if ($real_path === false || $real_base === false || strpos($real_path, $real_base) !== 0) {
                 return false;
             }
 
