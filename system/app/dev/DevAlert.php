@@ -14,16 +14,8 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-use GuzzleHttp\Client as Guzzle;
-
 class DevAlert
 {
-    /**
-     * Pending async promises
-     *
-     * @var array
-     */
-    public static array $promises = [];
 
     /**
      * Send an alert out to the site admins via email
@@ -42,22 +34,7 @@ class DevAlert
     }
 
     /**
-     * Wait for all async DevAlert promises to complete
-     */
-    public static function waitForPromises(): void
-    {
-        foreach (self::$promises as $promise) {
-            try {
-                $promise->wait();
-            } catch (Exception $e) {
-                // Log but don't throw - we don't want alert failures to break the app
-                error_log('DevAlert promise failed: ' . $e->getMessage());
-            }
-        }
-    }
-
-    /**
-     * Send slack alert out to the site admins
+     * Send Slack alert out to the site admins
      *
      * @param string $topic Alert subject
      * @param mixed $deets Details of error message
@@ -72,26 +49,24 @@ class DevAlert
                 return;
             }
 
-            $settings = array(
+            $body = self::constructBody($topic, $deets);
+
+            $payload = array(
+                'text'       => $body,
                 'username'   => $slack_config['username'] ?? 'JMVC Alert',
                 'channel'    => $slack_config['channel'] ?? '#devalerts',
                 'link_names' => true,
             );
 
-            $guzzle = new Guzzle();
-            $endpoint = $slack_config['endpoint'];
+            $response = wp_remote_post($slack_config['endpoint'], array(
+                'headers'  => array('Content-Type' => 'application/json'),
+                'body'     => wp_json_encode($payload),
+                'blocking' => false,
+            ));
 
-            $client = new Maknz\Slack\Client($endpoint, $settings, $guzzle);
-            $body = self::constructBody($topic, $deets);
-
-            // Send async
-            $message = $client->createMessage();
-            $message->setText($body);
-
-            $payload = $client->preparePayload($message);
-            $encoded = wp_json_encode($payload);
-
-            self::$promises[] = $guzzle->requestAsync('POST', $endpoint, array('body' => $encoded));
+            if (is_wp_error($response)) {
+                error_log('DevAlert Slack error: ' . $response->get_error_message());
+            }
         } catch (Exception $e) {
             error_log('DevAlert Slack error: ' . $e->getMessage());
         }
@@ -113,8 +88,6 @@ class DevAlert
      */
     public static function init(): void
     {
-        register_shutdown_function(array(__CLASS__, 'waitForPromises'));
-
         add_action('wp_ajax_devalert', array(__CLASS__, 'ajax_handler'));
     }
 

@@ -14,7 +14,6 @@
 
     "require": {
         "php": ">=8.0",
-        "guzzlehttp/guzzle": "^7.0",
         "predis/predis": "^2.0",
         "mthenw/nosqlite": "^0.3"
     },
