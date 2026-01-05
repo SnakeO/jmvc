@@ -6,8 +6,32 @@ JMVC brings the Model-View-Controller pattern to WordPress, enabling developers 
 
 ---
 
+## Why JMVC?
+
+Traditional WordPress development often leads to:
+
+| Problem | Traditional WordPress | With JMVC |
+|---------|----------------------|-----------|
+| **Code Organization** | Logic scattered across functions.php, templates, random includes | Controllers, Models, Views in designated directories |
+| **Routing** | Tied to permalink structure or manual rewrites | Clean URLs: `/controller/pub/Task/show/42` |
+| **Business Logic** | Mixed into theme templates | Isolated in Controllers and Models |
+| **Data Access** | Direct database calls or scattered queries | Models with built-in WordPress post type integration |
+| **API Development** | Repetitive REST API boilerplate | `APIController` with `api_success()` / `api_die()` |
+| **Testability** | Tightly coupled to WordPress globals | Isolated classes, mockable dependencies |
+| **Onboarding** | Every project organized differently | Standard MVC structure developers already know |
+
+**JMVC gives you Laravel-like structure while keeping everything WordPress:**
+- Custom Post Types become Models with magic property access
+- ACF fields accessible as `$model->field_name`
+- WordPress hooks, filters, and APIs still available
+- Theme header/footer integration via Page Controllers
+- Gutenberg blocks powered by PHP controllers
+
+---
+
 ## Table of Contents
 
+- [Why JMVC?](#why-jmvc)
 - [Features](#features)
 - [Requirements](#requirements)
 - [Installation](#installation)
