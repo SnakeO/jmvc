@@ -18,7 +18,7 @@ class ACFTestModel extends \JModelBase
 {
     use \ACFModelTrait;
 
-    public static $post_type = 'acf_test';
+    public static ?string $post_type = 'acf_test';
 }
 
 class ACFModelTraitTest extends TestCase

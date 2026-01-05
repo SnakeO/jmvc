@@ -239,11 +239,12 @@ namespace {
             if (!isset(WP_Mock_Data::$posts[$id])) {
                 return null;
             }
-            $post = WP_Mock_Data::$posts[$id];
+            $post_data = WP_Mock_Data::$posts[$id];
             if ($output === ARRAY_A) {
-                return (array) $post;
+                return (array) $post_data;
             }
-            return $post;
+            // Return a proper WP_Post object
+            return new WP_Post($post_data);
         }
     }
 

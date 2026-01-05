@@ -15,7 +15,7 @@ use WP_Mock_Data;
  */
 class TestModel extends \JModelBase
 {
-    public static $post_type = 'test_post';
+    public static ?string $post_type = 'test_post';
 }
 
 class JModelBaseTest extends TestCase
